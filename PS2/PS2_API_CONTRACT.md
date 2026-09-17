@@ -9,6 +9,10 @@ frontend work can start before the backend exists.
 **Machine truth.** FastAPI serves `/openapi.json` and `/docs`. Where this document and the
 generated schema disagree, the schema wins and this file is the bug.
 
+**Status: the backend is built and serving all of this** (`PS2_BACKEND_PLAN.md` §9, stages 1–9
+`done`). §10 below lists every way the built API differs from this document as first written —
+read it before wiring a screen.
+
 **Base URL** `/api` · JSON throughout · times ISO 8601 with `+08:00` · coordinates WGS84
 `[lon, lat]` (GeoJSON order).
 
@@ -51,6 +55,9 @@ by someone who walks slowly, and because the rubric caps specific failures.
 `message` is shown to the user as-is. Codes: `TRIP_NOT_FOUND`, `UPSTREAM_UNAVAILABLE`,
 `INVALID_REQUEST`, `PUSH_SUBSCRIPTION_INVALID`.
 
+This is the shape on the wire. FastAPI would normally wrap errors in `detail`; exception
+handlers unwrap it, so `error` is always top-level — including for validation failures.
+
 ---
 
 ## 2. Endpoint index
@@ -70,6 +77,8 @@ by someone who walks slowly, and because the rubric caps specific failures.
 | `DELETE` | `/api/push/subscribe` | Unregister and delete stored trips |
 | `POST` | `/api/push/test` | Fire a warning now (judge-facing, D4) |
 | `GET`/`POST` | `/api/scenario` | Read/toggle the labelled demo scenario (D1, D2) |
+| `GET` | `/api/push/key` | VAPID **public** key, needed before subscribing |
+| `GET` | `/api/destinations` | The one destination this app plans to |
 
 ---
 
@@ -78,7 +87,7 @@ by someone who walks slowly, and because the rubric caps specific failures.
 ### `POST /api/trips`
 
 ```json
-{ "origin": { "label": "Blk 123 Bedok North St 2", "coord": [103.9312, 1.3271] },
+{ "origin": { "label": "Blk 208B New Upper Changi Road", "coord": [103.930570, 1.324782] },
   "destination_id": "SGH",
   "appointment_at": "2026-09-19T10:30:00+08:00",
   "preferences": { "walking_pace": "slow", "avoid_stairs": true, "prefer_sheltered": true } }
@@ -402,3 +411,47 @@ is actually rendered:
 - [ ] `step_free: "unknown"` is worded as unknown, never as inaccessible
 - [ ] `offline_notice` appears whenever the cached bundle is used
 - [ ] `checks.label` shown near any warning, so "we detect, not predict" is visible
+
+
+---
+
+## 10. What the built API adds or changes
+
+Written during the backend build (stages 1–9). Each entry says why, with the issue number in
+`PS2_BACKEND_PLAN.md` §2 where there is one.
+
+### Changed
+
+| Field | Change | Why |
+|---|---|---|
+| `POST /api/trips` → `origin` | Example origin is now **Blk 208B New Upper Changi Road** `[103.930570, 1.324782]` | The old example's coordinate was not the address it named. Geocoded properly, "Blk 123 Bedok North St 2" is 1,364 m from the station — a 32-minute walk at her pace (**I12**). |
+| `summary.timing_basis` | Wording is generated, and always says *scheduled* | GTFS is a timetable, not a stopwatch (D8). Example: `"Train ride is a scheduled 31 min, fixed by the timetable. A train every 2.5 min at this hour, so 0–2.5 min of waiting. 707 m of walking at an assumed 0.7 m/s."` |
+| `options[].option_id` | Adds **`leave_earlier`** alongside `leave_later` | D2.1's rule only covered a delay that fits her buffer. The Annex C replay is 20 min against a 15 min buffer, so that option vanished. For a trip not yet begun, the useful advice is to leave earlier (**I14**). |
+| `alternatives.options[].duration_min` | May be `null` | We only state a bus journey time when OneMap can time that service for that departure. Otherwise the bus is still offered and the time is left unstated rather than invented (**I15**). |
+| `tiles.tile_pack_url` | `null`, and now carries `tiles.unavailable_reason` | I6 is parked. The reason is returned so the UI can explain it rather than showing an empty map. |
+
+### Added
+
+| Field | On | Meaning |
+|---|---|---|
+| `rerouted` | `RouteStatus` | `true` when a live outage blocked a door the stored plan used and the plan was rebuilt. The stored plan is updated, so `steps_plain` agrees with the banner (**I16**). |
+| `summary.walk_distance_m` | `TripPlan` | Total walking metres, so the UI need not sum legs. |
+| `lift_alerts[].parsed_exits`, `.line_prefix`, `.station_id`, `.detail` | `RouteStatus` | What the `LiftDesc` parser actually read. `detail` is a ready-to-show sentence; the others let a judge check the parse. |
+| `disruption.on_her_route`, `.free_bus_islandwide` | `RouteStatus` | The island-wide free-bus string is matched loosely, since LTA writes it both hyphenated and not (T4). |
+| `crowd[].window` | `RouteStatus` | `[StartTime, EndTime]` of the 10-minute bucket the reading covers. |
+| `weather.areas[]` | `RouteStatus` | Which named forecast areas were read **and how far away they are** — the nearest to SGH is *City* at 1.66 km. Resolution is an area, never her street (§6 limitation 10). |
+| `bus.stops`, `.distance_km`, `.first_bus`, `.last_bus`, `.not_running` | `Alternatives` | From LTA route data. `not_running: true` is the honest reading of an empty arrival list outside operating hours (T17) — it does not mean no bus exists. |
+| `GET /api/push/key` | — | The browser needs the VAPID **public** key before it can subscribe. |
+| `GET /api/destinations` | — | One entry, SGH. Keeps the destination out of the frontend as a literal. |
+| `POST /api/push/test` → `payload` | — | When no browser has subscribed, the response carries the message that *would* have been sent, so a judge can read it without pairing a device. |
+
+### Behaviour worth knowing
+
+- **Fetched on demand, never polled** — unchanged from §4, and now true of the plan too: `/status`
+  is what revises a stale plan.
+- **`PS2_USE_FIXTURES=1` runs the whole backend with no network**, serving recorded upstream
+  responses flagged `stale` with their capture time. The app also falls back to this on its own
+  when an upstream dies, so a screen must handle `stale: true` at any time.
+- **With no credentials at all**, planning, status, crowd and weather still work from committed
+  data and fixtures. Address search and push return `UPSTREAM_UNAVAILABLE` with a message naming
+  the missing credential.
