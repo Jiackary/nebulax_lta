@@ -1,0 +1,8 @@
+# Credentials — never commit (PS2 rubric caps the score for a committed key)
+.env
+.env.*
+!.env.example
+*.key
+
+# Local scratch
+generated_temp/
