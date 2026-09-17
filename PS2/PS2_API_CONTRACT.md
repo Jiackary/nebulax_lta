@@ -93,12 +93,16 @@ by someone who walks slowly, and because the rubric caps specific failures.
 {
   "trip_id": "t_9fK2",
   "appointment_at": "2026-09-19T10:30:00+08:00",
-  "recommended_departure": "2026-09-19T09:07:00+08:00",
   "summary": {
-    "duration_min": 53,
-    "range_min": [50, 61],
-    "arrival_window": ["2026-09-19T10:00:00+08:00", "2026-09-19T10:11:00+08:00"],
-    "timing_basis": "Train ride 31 min, fixed by timetable. Wait 0–5 min at this hour. Walking at 0.7 m/s.",
+    "leave_by": "2026-09-19T09:24:00+08:00",
+    "leave_by_label": "Leave at 09:24",
+    "arrival_window": ["2026-09-19T10:05:00+08:00", "2026-09-19T10:15:00+08:00"],
+    "arrival_label": "arrive 10:05–10:15",
+    "appointment_label": "appointment 10:30",
+    "buffer_min": 15,
+    "duration_min": 46,
+    "range_min": [41, 51],
+    "timing_basis": "Train ride 31 min, fixed by the timetable. Wait 0–5 min at this hour. Walking at 0.7 m/s.",
     "step_free": "yes",
     "sheltered_pct": 78
   },
@@ -112,10 +116,23 @@ by someone who walks slowly, and because the rubric caps specific failures.
 }
 ```
 
-**`range_min` is the uncertainty the brief demands** (`PS2_README.md:L248`). Per issue I1 in the
-backend plan, GTFS ride time is a **fixed** 30.7 min for EW5→EW16 with no variation, so the range
-comes from headway and walking pace, never from ride time. `timing_basis` says so in words —
-render it, do not hide it behind the number.
+**`leave_by_label` is the one big number on the screen.** She has an appointment and will not
+improvise on a platform, so "46 minutes" is not useful to her — "Leave at 09:24" is. Render
+`leave_by_label` large, with `arrival_label` and `appointment_label` as one quiet line beneath.
+
+**That quiet line is how the brief's uncertainty requirement is met** (`PS2_README.md:L248`,
+inside mandatory capability 3.2.1). The range is not removed, only demoted: `arrival_window` is
+a window, not a point, and it must stay visible. A bare point estimate risks the level-3 cap on
+route planning.
+
+**How `leave_by` is derived:** `appointment − buffer_min − range_min[1]`. The late end of the
+window lands on the buffer, so following the advice means arriving in time even on a slow day.
+Here: `10:30 − 15 − 51 = 09:24`, giving a window of `10:05–10:15`.
+
+**Where the range comes from** (issue I1): GTFS ride time is a **fixed** 30.7 min for EW5→EW16
+across all 698 trips — zero variation. The spread is entirely wait time (0–5 min at this hour)
+plus walking pace. `timing_basis` says so in words; show it on the detail view rather than the
+summary.
 
 `sheltered_pct` is the share of walking distance under `CoveredLinkWay`. Shown only when rain is
 forecast (D9).
@@ -155,7 +172,13 @@ For `mode: "walk"` the leg drops `line`/`access` and adds:
 
 ### `GET /api/trips/{id}/status` → `RouteStatus`
 
-The screen's banner and badges. Poll every 60 s while the trip screen is open.
+The screen's banner and badges.
+
+**Fetched on demand, not polled.** Call it when she opens the app or the trip, and when she pulls
+to refresh. There is no background recompute: warnings reach her by push from the 20:00 and 07:00
+checks (D3, D4), which is the whole point of those checks. Because the data is therefore as old as
+her last fetch, `observed_at` and `checks.label` are not optional — they are how the screen stays
+honest about its own age.
 
 ```json
 {
@@ -231,7 +254,7 @@ against the original so she can judge the trade-off (`PS2_README.md:L264`).
     "simulated_note": "Replay of a real LTA advisory format. Labelled for this demo.",
     "observed_at": "2026-09-19T08:12:00+08:00"
   },
-  "original": { "label": "Your usual route", "duration_min": 53,
+  "original": { "label": "Your usual route", "duration_min": 46,
                 "arrival_at": "2026-09-19T10:00:00+08:00", "viable": true,
                 "note": "Now about 20 minutes slower." },
   "options": [
@@ -371,7 +394,9 @@ is actually rendered:
 - [ ] `simulated_note` is visible wherever it appears (rubric caps mocked-as-live)
 - [ ] Every `severity` is paired with its `label`; no state is colour-only
 - [ ] `attribution` strings shown wherever the map or derived data appears (licence breach otherwise)
-- [ ] `summary.range_min` and `timing_basis` are both shown — uncertainty visible, not hidden
+- [ ] `leave_by_label` is the largest thing on the trip screen
+- [ ] `arrival_window` is shown as a window — never collapsed to one arrival time (L248, mandatory)
+- [ ] `observed_at` age is visible, since nothing recomputes in the background
 - [ ] `alternatives.original` rendered beside the options, not replaced by them
 - [ ] `resolution: "station_only"` never names an exit
 - [ ] `step_free: "unknown"` is worded as unknown, never as inaccessible
