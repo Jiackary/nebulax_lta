@@ -34,9 +34,10 @@ From D14's never-cut list, the backend owes the frontend seven things:
 Raised rather than worked around. Four are factual corrections; four are gaps to close.
 
 **Status as of 17 Sep 2026:** I1 and I2 are **resolved** — D8 was amended in the decision record
-(see D8 in its §7.3). I3 is **partly applied**: D8 now names `parent_station` as the better key,
-but D7's matcher description is unchanged and the 2/4 join figure in §3.2 has not been
-re-measured. I6 is **parked** at the team's direction. I4, I5, I7 and I8 are open.
+(see D8 in its §7.3). I3 is **applied but partly falsified** — see the measurement appended to it
+below; the 2/4 join figure is re-measured at stage 4, not here. I6 is **parked** at the team's
+direction. I7 is resolved by I9's decision to keep OneMap. I4, I5 and I8 are open.
+I9–I11 were added during stage 1 and are all resolved.
 
 ### I1 — D8 is wrong that GTFS gives "ride-time ranges" · ~~correction needed~~ **RESOLVED**
 
@@ -81,6 +82,54 @@ GTFS supplies both missing pieces:
 insurance for the demo path), but the automatic matcher should key on GTFS `stop_code` and
 resolve through `parent_station` before falling back to names. Re-measure the 2/4 figure after
 this change and update §3.2, §6 limitation 2 and trap T21 with whatever it becomes.
+
+> **Measured at stage 1, 17 Sep — the Stevens half of this is wrong.** `parent_station` does
+> unify the interchanges exactly as claimed (28 of them, `EW16 ← {EW16, NE3, TE17}`,
+> `DT10 ← {DT10, TE11}`), and that is what decides whether an outage is on her route. But it does
+> **not** recover Stevens' `(TEL) EXIT A`: GTFS lists DT10's entrances as `1`–`5`, which is
+> precisely what the shapefile holds. The lettered TEL-side exits are absent from *both* LTA
+> sources, so no keying strategy available to us resolves that row. It stays a station-level
+> warning, and §6 limitation 2 stands as written. The real win from GTFS is different and still
+> large: it keys on `stop_code` (kills the name join, T21) and ships WGS84 (kills the SVY21
+> reprojection, T19).
+
+### I9 — OneMap needs a token, and the DataMall key is not it · **resolved, token supplied**
+
+Plan §4 lists `sources/onemap.py` but nothing said where the credential comes from. Measured
+17 Sep: `common/elastic/search` returns `200` with results *and* an `"Authentication token
+missing"` error; `routingsvc/route` returns a hard **401**. The DataMall `AccountKey` does not
+work on OneMap — different agency. A token was supplied and is in `.env` as `ONEMAP_TOKEN`
+(JWT, expires **20 Sep 23:09 SGT** — after judging, but re-mint via `POST /api/auth/post/getToken`
+if it lapses).
+
+*How it is used:* geocoding for `/api/places/search`, and as the independent "plain foot route"
+baseline in `verify_stepfree.py` (D11). **Walking legs still route on our own OSM graph** —
+OneMap's walk router does not exclude `highway=steps` or know which lift is out, so D11's claim
+cannot rest on it. This also fills §8's `[routing service]` placeholder: OneMap sees her typed
+address at search time, and trip endpoints only in the offline verification script.
+
+### I10 — GTFS and `TrainStationExit` are the same survey, not two sources · **claim correction**
+
+Worth knowing before anyone writes "corroborated by two independent LTA datasets": of 585 exits
+present in both, **572 (97.8%) sit within 0.5 m of each other** and the median separation is
+exactly 0.00 m. They are one survey published twice.
+
+The shapefile still earns its place, for *coverage* rather than corroboration: it carries exits
+GTFS omits at 6 stations (Bugis 8 vs 4, Paya Lebar 6 vs 4, Telok Ayer 5 vs 3, Bukit Panjang,
+Choa Chu Kang, Tai Seng). `exits.geojson` is therefore the **union** — 603 exits, 591 from GTFS
+and 12 shapefile-only — with `source` on every feature.
+
+### I11 — A bbox OSM extract is not one connected graph · **routing trap**
+
+The corridor extract yields 198 components: Bedok (12,872 nodes) and Outram (5,873) as expected
+from two bboxes, but also **112 fragments of two nodes**. Snapping a trip to its nearest node
+lands on one of these — the nearest node to Outram Exit 4 is a 2-node stub, which made an
+existing 795 m walk look like "no path".
+
+`stepfree_graph.json` therefore ships a `components` map and `main_component_by_area`. The
+planner must snap only to nodes in the area's main component. Verified after the fix: home →
+Bedok Exit B is 1,351 m unrestricted with one staircase, **1,364 m step-free with none — a 13 m
+detour** — and Outram Exit 4 → SGH is 795 m, 66% sheltered, step-free either way.
 
 ### I4 — The GTFS response field is `link`, not `Link` · **parser trap**
 
@@ -277,7 +326,7 @@ needs to know in the Notes column.
 
 | # | Stage | Delivers | Status | Notes |
 |---|---|---|---|---|
-| 1 | **Data pipeline** (§5) — `scripts/build_data.py` | `stations.json`, `exits.geojson`, `headways.json`, `stepfree_graph.json` | `not started` | Nothing else is testable without this. Includes the I3 matcher rework — do it here, not later. |
+| 1 | **Data pipeline** (§5) — `scripts/build_data.py` | `stations.json`, `line_codes.json`, `exits.geojson`, `ridetimes.json`, `headways.json`, `stepfree_graph.json`, `covered_ways.geojson` | `done` | Run 17 Sep against live feeds; outputs committed under `backend/data/derived/`. Reproduces both recorded figures exactly: EW5→EW16 is 30.67 min across all 698 trips (I1/T24), EW5 weekday headway 2.5 min at 08h / 5.0 off-peak (D8). **For later stages:** exits are a 603-row union, `source` per feature (I10); snap walking legs via `components` + `main_component_by_area` or you will land on one of 112 two-node stubs (I11); shelter is LTA `CoveredLinkWay` ∪ OSM tags. |
 | 2 | **Sources + cache** (§6) | `app/sources/*` with recorded fixtures | `not started` | Fixtures let dev run without hammering upstream, and make the demo survive a dead network. |
 | 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `not started` | Everything else decorates this. Timing range from headway + pace, never ride time (I1). |
 | 4 | **Lift matcher + reroute** | Capability 2 | `not started` | The product's whole point. Re-measure the §3.2 join rate here and report the new figure. |
