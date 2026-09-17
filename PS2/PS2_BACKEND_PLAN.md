@@ -36,8 +36,8 @@ Raised rather than worked around. Four are factual corrections; four are gaps to
 **Status as of 17 Sep 2026:** I1 and I2 are **resolved** — D8 was amended in the decision record
 (see D8 in its §7.3). I3 is **applied but partly falsified** — see the measurement appended to it
 below; the 2/4 join figure is re-measured at stage 4, not here. I6 is **parked** at the team's
-direction. I7 is resolved by I9's decision to keep OneMap. I4, I5 and I8 are open.
-I9–I11 were added during stage 1 and are all resolved.
+direction. **I4, I5, I7 and I8 are now all closed** — see the notes on each.
+I9–I17 were raised during the build and are all resolved or stated.
 
 ### I1 — D8 is wrong that GTFS gives "ride-time ranges" · ~~correction needed~~ **RESOLVED**
 
@@ -202,18 +202,19 @@ planner must snap only to nodes in the area's main component. Verified after the
 Bedok Exit B is 1,351 m unrestricted with one staircase, **1,364 m step-free with none — a 13 m
 detour** — and Outram Exit 4 → SGH is 795 m, 66% sheltered, step-free either way.
 
-### I4 — The GTFS response field is `link`, not `Link` · **parser trap**
+### I4 — The GTFS response field is `link`, not `Link` · ~~parser trap~~ **CLOSED**
 
 Guide v6.9 p.56 documents the attribute as `Link`. The live response returns lowercase `link`,
 plus an **undocumented `timestamp`**. A parser written from the documentation returns `KeyError`.
-Add to `PS2_INDEX.md` as a trap.
+Added to `PS2_INDEX.md` as trap T22. `build_data.py` reads `link` and falls back to `Link`, so
+it survives LTA fixing this either way.
 
-### I5 — "No poller" (D1) reads as contradicting the 20:00/07:00 checks (D3) · **wording**
+### I5 — "No poller" (D1) reads as contradicting the 20:00/07:00 checks (D3) · ~~wording~~ **CLOSED**
 
 D1 ends "No poller." D3 requires scheduled checks at 20:00 and 07:00, which is a scheduled
 process. These are different things — D1 means no historical accumulation of outage data — but
-the bare phrase invites a judge's question. Suggest D1 read "No historical poller; the scheduled
-checks in D3 are unaffected."
+the bare phrase invites a judge's question. **Applied:** D1 now reads "No historical poller; the
+scheduled checks in D3 are unaffected."
 
 ### I6 — D6's offline tiles depend on an unmade decision · **PARKED** by the team
 
@@ -223,20 +224,23 @@ D6 caches map tiles for her route offline, "only as the tile provider's terms al
 filled with a provider whose terms permit offline caching. This also blocks the privacy
 statement. **Decide this before any frontend map work.**
 
-### I7 — "Nearest" barrier-free taxi stand is undefined · **small spec gap**
+### I7 — "Nearest" barrier-free taxi stand is undefined · ~~small spec gap~~ **CLOSED**
 
 D2.3 offers "the nearest `TaxiStands` entry flagged `Bfa`". Nearest to what? She has no live
 location (§8 commitment 2). It must mean nearest to the station she is at or heading to.
 
 Verified this works: of 316 taxi stands, **293 are `Bfa=Yes`**, and the nearest to SGH is
 `Outram Rd outside Outram Park MRT Station` at **478 m** — the right answer, directly outside her
-interchange. Specify the anchor explicitly as "her current leg's station".
+interchange. **Applied:** the anchor is the station the current leg is heading to, passed explicitly to
+`_taxi_option`. For her trip that is `EW16`, and the stand comes back at **32 m** — measured from
+the station coordinate rather than the 478 m quoted here, which was measured from the hospital.
 
-### I8 — §9's "five minutes" link expiry is now partly stale · **minor**
+### I8 — §9's "five minutes" link expiry is now partly stale · ~~minor~~ **CLOSED**
 
 §9 says `GeospatialWholeIsland` links are "valid for five minutes only". Under v6.9 several
 download links are documented at 15 minutes, and GTFS is confirmed at 15. Harmless (downloading
-immediately is correct either way) but worth a footnote.
+immediately is correct either way) but worth a footnote. **Applied:** `build_data.py` downloads
+each link immediately and never stores one, so the expiry never matters in practice.
 
 **None of these change the persona decision or D14's never-cut list.** I1, I3 and I6 change what
 gets built; the rest are documentation fixes.

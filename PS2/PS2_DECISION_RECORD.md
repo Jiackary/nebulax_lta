@@ -335,7 +335,8 @@ gets cut if time runs short. Decision numbers (D1–D14) are referenced from §5
 **D1. The demo lift outage is synthetic and labelled.** Live outages on 17 Sep were at Stevens,
 Hougang, Clarke Quay and Jelapang. None is on Bedok → Outram Park, and a real outage at either
 of her stations before judging is unlikely. We inject one outage at Outram Park in the exact
-`v2/FacilitiesMaintenance` shape and label it on screen and in `WRITEUP.md`. No poller.
+`v2/FacilitiesMaintenance` shape and label it on screen and in `WRITEUP.md`. No historical
+poller; the scheduled checks in D3 are unaffected.
 
 **D2. In an EWL disruption she gets three options, before she leaves home.** The scenario is a
 labelled replay of the Annex C lifecycle (S4 p.58–72). Bedok is in predefined free-shuttle area 3
