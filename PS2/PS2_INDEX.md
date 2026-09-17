@@ -27,7 +27,7 @@ All paths below are relative to `PS2/` unless prefixed with `../`.
 | S8 | `references/4dayWeatherForecast.json` | OpenAPI 3.0.3 spec for `GET /four-day-outlook`. **Interface doc, not data.** | Schema in §4.4. |
 | S9 | `submission/README.md` (119 lines) | **How to package and hand in.** Repo layout, README requirements, credential rules, claims rules, pre-submission checklist. | Logistics (where/when to submit) are still `TBC` — see §8. |
 | S10 | `../README.md` | Repo-wide overview covering PS1/PS2/PS3 + DataMall quick start. | Contains three broken references — see §7.1. |
-| S11 | `PS2_DECISION_RECORD.md` *(ours)* | **Why we build for Mdm Lim.** The three pre-commitment checks, their live-API results, the end-to-end join validation, and the limitations to carry into `WRITEUP.md`. | Written 17 Sep 2026. Read this before re-litigating the persona choice. |
+| S11 | `PS2_DECISION_RECORD.md` *(ours)* | **Why we build for Mdm Lim.** The three pre-commitment checks, their live-API results, the end-to-end join validation, the limitations to carry into `WRITEUP.md`, the build decisions D1–D14 (§7) and a draft privacy statement (§8). | Written 17 Sep 2026. Read this before re-litigating the persona choice. |
 | S12 | `evidence/` *(ours)* | Timestamped captures backing claims in S11 — currently the `v2/FacilitiesMaintenance` snapshot. | Ship these: the brief requires captured data for any live-feed claim. |
 
 **Not in the repo but named as required reading:** the DataMall portal's static master lists
@@ -401,3 +401,5 @@ python3 -m venv "$SP/venv"
 | What's missing / inconsistent in the pack | §7 above |
 | What to ask the organisers | §8 above |
 | Why we chose Mdm Lim, and the evidence | `PS2_DECISION_RECORD.md` |
+| What we decided to build, and what gets cut | `PS2_DECISION_RECORD.md` §7 |
+| What the privacy statement says | `PS2_DECISION_RECORD.md` §8 |

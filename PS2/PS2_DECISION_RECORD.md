@@ -2,6 +2,8 @@
 
 **Decision.** Build for **Mdm Lim**, the accessibility-constrained occasional traveller.
 **Status.** Accepted, 17 Sep 2026. All three pre-commitment checks run against live APIs and passed.
+Build decisions (§7) and a draft privacy statement (§8) added the same day, after an adversarial
+review of this record. Where §7 corrects an earlier section, the original text is kept and marked.
 **Supersedes.** Nothing. This is the first persona decision.
 
 This record exists so the choice is auditable: what we checked, what the APIs actually
@@ -65,6 +67,10 @@ after the first call and byte-identical, so the feed is stable rather than flick
 | `BPLRT` | `BP12` Jelapang | *(empty)* | `Lift 1 (connecting concourse to Platform 1)` |
 
 The demo can run on real outages. No replay, no labelling caveat.
+
+> **Corrected by D1 (§7.1).** The check proves the feed is live. It does not show that an outage
+> will be on her route: none of the four is at Bedok or Outram Park. The demo outage is injected
+> and labelled.
 
 ### Check 2 — Is OSM step-free tagging good enough on her corridor?
 
@@ -211,12 +217,16 @@ Weights are Problem Fit **40%**, Technical Execution **35%**, Ease of Use **25%*
   do multi-modal routing, crowding hints and departure-time suggestions today. Mdm Lim is
   served by essentially nothing — no consumer app in Singapore routes on lift availability
   at exit granularity. The delta is the score, and hers is far larger.
+  *Corrected by D12 (§7.4): MyTransport.SG and SMRT's app do show lift availability. The gap
+  is narrower than "essentially nothing".*
 - **Technical Execution — close, slight edge to Arjun on visible surface area.** He touches
   more modes and more endpoints. But the criterion reads "breadth *and judgement* of the
   data brought in," and her build wins on judgement: `SilverZone` (LTA's elderly-pedestrian
   zones, mentioned nowhere in the brief), `PedestrainOverheadbridge_UnderPass` used
   *inverted* as an obstacle map because an overhead bridge means stairs, and a free-text-to-
   geometry join harder than anything in Arjun's pipeline.
+  *Corrected by D10 (§7.3): both layers are dropped, and "an overhead bridge means stairs"
+  does not hold.*
 - **Ease of Use — Mdm Lim, decisively.** Accessibility is named inside this criterion and
   again inside the visualisation requirement. Building for her means the accessibility work
   *is* the product rather than a pass made at the end. Arjun's side-by-side comparison view
@@ -245,6 +255,11 @@ bike — has **no feed behind it at all**; it is operator policy, so it would be
 This asymmetry does not close with better execution. A brilliantly built Arjun still makes
 an unfalsifiable central claim; a merely competent Mdm Lim makes a falsifiable one.
 
+> **Narrowed by D11 (§7.4).** "This route has no stairs" can only be checked against OSM, and
+> station interiors are not modelled. The claim we defend is the narrower one in D11. Arjun's
+> side is also overstated: "platform forecast `m` instead of `h`" is checkable against
+> `PCDForecast`. Keep this comparison out of `WRITEUP.md`.
+
 ### 5.3 What we are giving up
 
 Recorded honestly, because these are real.
@@ -263,10 +278,10 @@ Recorded honestly, because these are real.
 
 State all of these. The brief credits stated assumptions and known limits.
 
-1. **No day-before lift warning.** `v2/FacilitiesMaintenance` carries no date fields, so we
-   **detect rather than predict**. We check at plan time and re-check the morning she
-   travels. She has not left home, so this still satisfies "proactive" as the brief defines
-   it — but it costs her the advance notice her persona asks for.
+1. **The day-before lift warning reflects status at check time only.** `v2/FacilitiesMaintenance`
+   carries no date fields, so we **detect rather than predict**. We check her route at 20:00 the
+   evening before and again at 07:00 on the day (D3). An outage that starts after the last check
+   is not caught.
 2. **Exit join succeeds on 2 of 4 live rows.** Interchange stations with two operators
    (Stevens) fail; internal lifts (Jelapang) have no exit to join to. Failures degrade to
    station-level warnings, never to silent mis-routing.
@@ -277,10 +292,183 @@ State all of these. The brief credits stated assumptions and known limits.
    inaccessibility. Treat unknown as unknown, not as unusable.
 6. **The provided station GeoJSON is a 2017 planning snapshot** with no station codes and 13
    null names; we use it only for `GRND_LEVEL`. See trap T13 in `PS2_INDEX.md`.
+7. **The demo lift outage and the EWL disruption are injected, not live,** and labelled as such
+   on screen (D1, D2). Real outages elsewhere on the network are shown live.
+8. **Station interiors are not modelled.** The step-free claim covers OSM-mapped walking legs
+   and the entrances and exits used, not the route inside a station (D11).
+9. **Crowding is per station, not per train,** and it does not change her route (D9).
+10. **Rain is judged at the 2-hour nowcast's area resolution,** not at her street (D9).
 
 ---
 
-## 7. Reproducing this
+## 7. Build decisions
+
+Accepted 17 Sep 2026. Each entry says what we build, why, and what it costs. §7.5 sets what
+gets cut if time runs short. Decision numbers (D1–D14) are referenced from §5 and §6.
+
+### 7.1 Demo and evidence
+
+**D1. The demo lift outage is synthetic and labelled.** Live outages on 17 Sep were at Stevens,
+Hougang, Clarke Quay and Jelapang. None is on Bedok → Outram Park, and a real outage at either
+of her stations before judging is unlikely. We inject one outage at Outram Park in the exact
+`v2/FacilitiesMaintenance` shape and label it on screen and in `WRITEUP.md`. No poller.
+
+**D2. In an EWL disruption she gets three options, before she leaves home.** The scenario is a
+labelled replay of the Annex C lifecycle (S4 p.58–72). Bedok is in predefined free-shuttle area 3
+(`PS2_INDEX.md` §5.3). Each option is shown against the original route with its time cost.
+
+1. **Leave later.** Offered when the delay parsed from `Message` ("additional travelling time of
+   N minutes") fits within her buffer before the appointment. She keeps her usual step-free route.
+2. **Regular bus to SGH.** `v3/BusArrival` is checked for `Feature=WAB` and `Load=SEA`.
+3. **Barrier-free taxi.** The nearest `TaxiStands` entry flagged `Bfa`, with a walking route to
+   it. No fare estimate, because we cannot verify one.
+
+Free bridging buses and MRT shuttles are not offered. They run crowded and standing, which is
+the wrong trade for a slow walker who avoids improvising.
+
+**D3. The day-before warning checks at 20:00 and again at 07:00.** The feed has no dates (trap
+T8), so each check sees only what is broken at that moment. No figure is claimed for how often
+an evening outage is still there next morning. Limitation 1 in §6 carries the wording.
+
+### 7.2 Architecture
+
+**D4. Warnings go out by Web Push, with an in-app banner as fallback.** This stays a pure web
+app, with no app store and no native build. Android Chrome delivers push from a normal tab once
+she allows notifications. On iPhone she first adds the site to her Home Screen (iOS 16.4+), and
+the app walks her through it once. Without push, the warning shows as a banner when she opens
+the app. A "send test warning now" button lets judges see it without waiting for 20:00.
+
+**D5. A hosted HTTPS deployment for phones, plus a README that runs it locally.** Push and
+offline caching both need HTTPS, and the 20:00 check needs a process that is always running.
+Judges open the hosted link on a phone. The README runs the same code on a clean machine, with
+a free tunnel (e.g. `cloudflared`) to give a phone an HTTPS address. The DataMall key lives in
+the host's environment variables, never in the repository.
+
+**D6. Underground, her whole trip is cached on the phone.** Saved when she plans or opens the
+trip: the step list in large text, her exits and lifts, and map tiles for her route only.
+Offline, the screen reads "No signal: plan as of HH:MM", and nothing live is presented as
+current. Tiles are cached only as the tile provider's terms allow (`PS2_README.md:L57`). This is
+the no-signal choice the brief asks us to state (`PS2_README.md:L215`).
+
+### 7.3 Data
+
+**D7. Lift outages are matched to exits automatically, with a hand-checked table for her two
+stations.** The matcher from §3.2 runs island-wide, so real outages elsewhere appear correctly
+and show the live path works alongside the synthetic one. Bedok and Outram Park get a
+hand-checked table of every lift, the exit it serves and whether it is step-free, built from
+OSM, `TrainStationExit` and a manual read of the operators' station pages. Outram Park is a
+three-line, two-operator interchange, the same shape as Stevens where matching failed, and the
+2/4 test in §3.2 never touched it. A row that cannot be matched becomes a station-level warning.
+
+**D8. GTFS train timetable, time-boxed to about an hour.** API guide v6.9 (S4b in
+`PS2_INDEX.md`) adds `GTFSScheduleTrain`. If it returns usable data with our key, it supplies
+frequency and ride-time ranges for the EWL leg, which is how timing uncertainty is made visible
+(`PS2_README.md:L248`). If not, we fall back to OneMap timing with published frequencies as the
+range. The two GTFS realtime feeds are not used: they only carry data during disruptions, and
+our disruption is a `TrainServiceAlerts` replay.
+
+**D9. Rain changes her walking route; crowding is shown but changes nothing.** When the 2-hour
+nowcast forecasts rain for her home or SGH area, walking legs keep to `CoveredLinkWay` even when
+longer, and the app says why. Station crowding from `PCDRealTime` appears as one badge per
+station for Bedok and Outram Park, as a word plus colour. That covers the crowding item in the
+visualisation requirement (`PS2_README.md:L266`), which would otherwise risk the level-3 cap.
+`PCDForecast` departure advice and `PubFloodAlerts` are out of scope.
+
+**D10. `PedestrainOverheadbridge_UnderPass` and `SilverZone` are dropped.** The premise that an
+overhead bridge means stairs does not hold. Within 1.5 km of SGH and of Bedok, 8 of 109 OSM
+footbridges have a mapped lift within about 40 m (Overpass, 17 Sep 2026). OSM `highway=steps`
+already keeps her off bridge stairs, and `SilverZone` changes no route we can name. `WRITEUP.md`
+gets two lines on why both were considered and rejected.
+
+### 7.4 Claims
+
+**D11. The step-free claim is narrow and backed by a script.** The claim: no walking leg uses an
+OSM-mapped staircase, and every station entrance or exit used is either `wheelchair=yes` in OSM
+or has an in-service lift in `v2/FacilitiesMaintenance`. A script in the repository plans her
+trip and prints the check next to a plain foot route for the same trip, and states that station
+interiors are not modelled. If the plain foot route has no steps on her corridor, the comparison
+half is dropped and the rest stands.
+
+**D12. `WRITEUP.md` does not mention competitors.** Have one spoken line ready in case a judge
+raises MyTransport.SG, SMRT's app or Google Maps' wheelchair-accessible option: what we add is
+moving her walk to a different exit when a lift is out, and warning her the evening before.
+
+**D13. No model.** Delay minutes in `Message` and exit references in `LiftDesc` are parsed with
+rules. The rules are scored on every example we hold (the Annex C messages, the four captured
+`LiftDesc` rows, and notices copied by hand from `t.me/s/sgmrt`), and `WRITEUP.md` reports the
+result as n/N with the examples shipped. A short section argues why rules beat a model here: the
+text is formulaic, rules run offline and instantly, and judges can check them without paying
+(`PS2_README.md:L312`, `L316`).
+
+### 7.5 Scope
+
+**D14. Never cut:**
+
+- Door-to-door route (step-free walks, EWL leg) on an OSM map with attribution
+- Lift outage reroute (D1, D7)
+- EWL disruption replay with alternatives shown against the original (D2)
+- Visuals: affected route section shown by pattern and label, crowd badges, large text
+- Web Push with the 20:00 and 07:00 checks and the banner (D3, D4)
+- Offline trip, including map tiles (D6)
+- Rain → sheltered walk (D9)
+- Hosting and README (D5), step-free script (D11), measured rules and write-up (D13)
+
+**Cut in this order if time runs short:**
+
+1. Barrier-free taxi option (D2.3)
+2. Live bus checks, keeping a plain OneMap bus route (D2.2)
+3. GTFS timetable, falling back to OneMap timing plus published frequencies (D8)
+
+---
+
+## 8. Privacy statement (draft for `WRITEUP.md`)
+
+The brief requires it: *"If your app collects a user's routine or location, say in your
+submission what you store, where, and for how long"* (`PS2_README.md:L208`). D3–D6 mean we store
+her trips on a server, so this applies.
+
+The draft makes promises the build must keep. Before copying it into `WRITEUP.md`, check each
+item in the list after it against the code, and fill the bracketed placeholders once hosting,
+tiles and routing are chosen.
+
+> **Privacy: what we store, where, and for how long**
+>
+> The app has no accounts. It never asks for a name, phone number or email address.
+>
+> **On the phone**, in the browser's own storage: the home location she enters, her upcoming
+> appointments, her text-size setting, and a saved copy of each trip with map tiles for its
+> route. This stays on the phone until she deletes the trip or clears the site's data.
+>
+> **On our server**, only what the evening and morning checks need: each planned trip (start
+> and end coordinates, appointment date and time, and the stations, exits and lifts on the
+> route) and the push subscription the browser issues so we can notify her phone. A trip is
+> deleted from the server 24 hours after its appointment time, or immediately when she removes
+> it or turns off notifications.
+>
+> **What we do not collect:** her live location. The app does not use the phone's location
+> service; routes start from the home location she typed in.
+>
+> **Who else sees what.** Routing requests send a trip's start and end points to [routing
+> service]. Map tiles come from [tile provider], which can see which part of the map is being
+> viewed. Notifications pass through the phone's push service (Google or Apple), which sees that
+> a message was sent but not its contents, because Web Push messages are encrypted. Requests to
+> LTA DataMall and data.gov.sg carry no personal data. [Hosting provider] keeps standard request
+> logs for [period]; the app does not write trip details to its logs.
+>
+> We do not share or sell this data, and we use it only to plan her trips and warn her about them.
+
+**Commitments the build must meet for this to be true:**
+
+1. Server trip records are deleted 24 hours after the appointment, and immediately on removal
+   or when notifications are turned off.
+2. The app never calls the browser's geolocation API.
+3. Server logs never include request bodies or trip details.
+4. No analytics or third-party scripts beyond the map library and tile provider.
+5. Placeholders filled: routing service, tile provider, hosting provider and its log period.
+
+---
+
+## 9. Reproducing this
 
 ```bash
 cp PS2/.env.example PS2/.env     # add your free AccountKey from datamall.lta.gov.sg
