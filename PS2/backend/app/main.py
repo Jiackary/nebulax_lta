@@ -13,7 +13,7 @@ from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import data, store
+from . import data, jobs, store
 from .config import ATTRIBUTION, LTA_ACCOUNT_KEY, ONEMAP_TOKEN, USE_FIXTURES
 
 
@@ -21,7 +21,11 @@ from .config import ATTRIBUTION, LTA_ACCOUNT_KEY, ONEMAP_TOKEN, USE_FIXTURES
 async def lifespan(app: FastAPI):
     store.init()
     data.walk_graph()          # load the graph once, not on first request
-    yield
+    scheduler = jobs.start()   # 20:00 / 07:00 checks and the 03:00 sweep (D3)
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(
@@ -54,11 +58,12 @@ async def _validation_error(request: Request, exc: RequestValidationError):
                   "retryable": False}})
 
 
-from .api import alternatives, status, trips  # noqa: E402
+from .api import alternatives, push, status, trips  # noqa: E402
 
 app.include_router(trips.router, prefix="/api")
 app.include_router(status.router, prefix="/api")
 app.include_router(alternatives.router, prefix="/api")
+app.include_router(push.router, prefix="/api")
 
 
 @app.get("/api/health")
