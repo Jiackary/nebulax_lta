@@ -34,11 +34,16 @@ CREATE TABLE IF NOT EXISTS push_subs (
     keys        TEXT NOT NULL,
     trip_ids    TEXT NOT NULL
 );
+-- One row per (trip, dated check, endpoint). Marking per trip was
+-- all-or-nothing, so one failing subscription re-sent to the working ones on a
+-- later run (F18); and the key carried no date, so Monday's 20:00 run could
+-- satisfy Wednesday's evening-before warning (F19).
 CREATE TABLE IF NOT EXISTS sent (
     trip_id   TEXT NOT NULL,
     check_at  TEXT NOT NULL,
+    endpoint  TEXT NOT NULL DEFAULT '',
     digest    TEXT NOT NULL,
-    PRIMARY KEY (trip_id, check_at)
+    PRIMARY KEY (trip_id, check_at, endpoint)
 );
 """
 
@@ -63,25 +68,43 @@ def init() -> None:
         if "plan_original" not in cols:
             c.execute("ALTER TABLE trips ADD COLUMN plan_original TEXT")
             c.execute("UPDATE trips SET plan_original = plan WHERE plan_original IS NULL")
+        # A database created before F18 keys `sent` per trip, not per endpoint.
+        sent_cols = {r["name"] for r in c.execute("PRAGMA table_info(sent)")}
+        if sent_cols and "endpoint" not in sent_cols:
+            c.execute("ALTER TABLE sent RENAME TO sent_old")
+            c.executescript(SCHEMA)
+            c.execute("INSERT INTO sent (trip_id, check_at, endpoint, digest)"
+                      " SELECT trip_id, check_at, '', digest FROM sent_old")
+            c.execute("DROP TABLE sent_old")
 
 
 def new_trip_id() -> str:
-    return "t_" + secrets.token_urlsafe(4).replace("-", "").replace("_", "")[:4]
+    """A trip id is the only thing protecting her home coordinate.
+
+    It used to be 4 characters — about 14.8M values, and roughly 0.03% came out
+    as 3 — while GET, DELETE, status and offline need nothing else (F30).
+    """
+    return "t_" + secrets.token_urlsafe(16)
 
 
 def save_trip(appointment_at: datetime, origin: dict, preferences: dict, plan: dict,
               plan_original: dict | None = None) -> str:
-    trip_id = new_trip_id()
     plan_original = plan_original if plan_original is not None else plan
-    with conn() as c:
-        c.execute(
-            "INSERT INTO trips (trip_id, created_at, appointment_at, origin, preferences,"
-            " plan, plan_original) VALUES (?,?,?,?,?,?,?)",
-            (trip_id, datetime.now(SGT).isoformat(timespec="seconds"),
-             appointment_at.astimezone(SGT).isoformat(timespec="seconds"),
-             json.dumps(origin), json.dumps(preferences),
-             json.dumps(plan), json.dumps(plan_original)))
-    return trip_id
+    for _ in range(5):                        # retry a collision rather than 500
+        trip_id = new_trip_id()
+        try:
+            with conn() as c:
+                c.execute(
+                    "INSERT INTO trips (trip_id, created_at, appointment_at, origin,"
+                    " preferences, plan, plan_original) VALUES (?,?,?,?,?,?,?)",
+                    (trip_id, datetime.now(SGT).isoformat(timespec="seconds"),
+                     appointment_at.astimezone(SGT).isoformat(timespec="seconds"),
+                     json.dumps(origin), json.dumps(preferences),
+                     json.dumps(plan), json.dumps(plan_original)))
+            return trip_id
+        except sqlite3.IntegrityError:
+            continue
+    raise RuntimeError("could not allocate a trip id")
 
 
 def get_trip(trip_id: str) -> dict | None:
@@ -122,11 +145,23 @@ def trips_between(start: datetime, end: datetime) -> list[dict]:
 
 
 def save_subscription(endpoint: str, keys: dict, trip_ids: list[str]) -> None:
+    """Upsert, merging `trip_ids` rather than replacing them.
+
+    INSERT OR REPLACE overwrote the list, so re-subscribing for trip B silently
+    unlinked trip A: A got no warnings and `DELETE /push/subscribe` left it on
+    the server, against privacy commitment 1 (F31).
+    """
     with conn() as c:
+        row = c.execute("SELECT trip_ids FROM push_subs WHERE endpoint=?",
+                        (endpoint,)).fetchone()
+        merged = list(json.loads(row["trip_ids"])) if row else []
+        for tid in trip_ids:
+            if tid not in merged:
+                merged.append(tid)
         c.execute("INSERT OR REPLACE INTO push_subs (endpoint, created_at, keys, trip_ids)"
                   " VALUES (?,?,?,?)",
                   (endpoint, datetime.now(SGT).isoformat(timespec="seconds"),
-                   json.dumps(keys), json.dumps(trip_ids)))
+                   json.dumps(keys), json.dumps(merged)))
 
 
 def subscriptions() -> list[dict]:
@@ -136,7 +171,7 @@ def subscriptions() -> list[dict]:
              "trip_ids": json.loads(r["trip_ids"])} for r in rows]
 
 
-def delete_subscription(endpoint: str) -> dict:
+def delete_subscription(endpoint: str, delete_trips: bool = True) -> dict:
     """Unsubscribing deletes her stored trips too (§8 commitment 1).
 
     One endpoint only. The `endpoint=None` branch used to delete every
@@ -150,14 +185,25 @@ def delete_subscription(endpoint: str) -> dict:
                          (endpoint,)).fetchall()
         c.execute("DELETE FROM push_subs WHERE endpoint=?", (endpoint,))
         trip_ids = {t for r in subs for t in json.loads(r["trip_ids"])}
-        for tid in trip_ids:
-            c.execute("DELETE FROM trips WHERE trip_id=?", (tid,))
-            c.execute("DELETE FROM sent WHERE trip_id=?", (tid,))
+        if delete_trips:
+            for tid in trip_ids:
+                c.execute("DELETE FROM trips WHERE trip_id=?", (tid,))
+                c.execute("DELETE FROM sent WHERE trip_id=?", (tid,))
+        else:
+            # Pruning an expired endpoint (404/410) must not delete her trips.
+            trip_ids = set()
+            c.execute("DELETE FROM sent WHERE endpoint=?", (endpoint,))
     return {"subscriptions_removed": len(subs), "trips_removed": len(trip_ids)}
 
 
-def sweep(now: datetime | None = None) -> int:
-    """Delete trips more than 24 h past their appointment (§8 commitment 1)."""
+def sweep(now: datetime | None = None) -> dict:
+    """Delete trips more than 24 h past their appointment (§8 commitment 1).
+
+    Run hourly and at startup. Daily at 03:00 meant a 03:30 appointment survived
+    the next sweep at 23.5 h and only went at 47.5 h — about 48 h, not the 24
+    promised (F20). Subscriptions whose trips are all gone go too; they were
+    never swept and kept dangling trip_ids.
+    """
     now = now or datetime.now(SGT)
     cutoff = now - timedelta(hours=24)
     removed = 0
@@ -165,24 +211,50 @@ def sweep(now: datetime | None = None) -> int:
         if datetime.fromisoformat(t["appointment_at"]) < cutoff:
             delete_trip(t["trip_id"])
             removed += 1
-    return removed
 
-
-def mark_sent(trip_id: str, check_at: str, digest: str) -> bool:
-    """True if this is new — stops a check re-sending the same warning."""
+    live = {t["trip_id"] for t in all_trips()}
+    subs_removed = 0
     with conn() as c:
-        row = c.execute("SELECT digest FROM sent WHERE trip_id=? AND check_at=?",
-                        (trip_id, check_at)).fetchone()
-        if row and row["digest"] == digest:
+        for row in c.execute("SELECT endpoint, trip_ids FROM push_subs").fetchall():
+            linked = json.loads(row["trip_ids"])
+            if linked and not (set(linked) & live):
+                c.execute("DELETE FROM push_subs WHERE endpoint=?", (row["endpoint"],))
+                subs_removed += 1
+    return {"trips": removed, "subscriptions": subs_removed}
+
+
+def claim_send(trip_id: str, check_at: str, endpoint: str, digest: str) -> bool:
+    """Claim one delivery. True if this caller won it and should send.
+
+    Atomic, so two uvicorn workers running the same cron minute cannot both
+    send. `check_at` carries the date, and the claim is per endpoint (F18, F19).
+    """
+    with conn() as c:
+        existing = c.execute(
+            "SELECT digest FROM sent WHERE trip_id=? AND check_at=? AND endpoint=?",
+            (trip_id, check_at, endpoint)).fetchone()
+        if existing and existing["digest"] == digest:
             return False
-        c.execute("INSERT OR REPLACE INTO sent (trip_id, check_at, digest) VALUES (?,?,?)",
-                  (trip_id, check_at, digest))
-    return True
+        if existing:
+            c.execute("DELETE FROM sent WHERE trip_id=? AND check_at=? AND endpoint=?",
+                      (trip_id, check_at, endpoint))
+        cur = c.execute(
+            "INSERT OR IGNORE INTO sent (trip_id, check_at, endpoint, digest)"
+            " VALUES (?,?,?,?)", (trip_id, check_at, endpoint, digest))
+        return cur.rowcount > 0
 
 
-def was_sent(trip_id: str, check_at: str, digest: str) -> bool:
+def release_send(trip_id: str, check_at: str, endpoint: str) -> None:
+    """Undo a claim whose delivery failed, so a later run retries it."""
+    with conn() as c:
+        c.execute("DELETE FROM sent WHERE trip_id=? AND check_at=? AND endpoint=?",
+                  (trip_id, check_at, endpoint))
+
+
+def was_sent(trip_id: str, check_at: str, digest: str, endpoint: str = "") -> bool:
     """Whether this check already delivered an unchanged warning."""
     with conn() as c:
-        row = c.execute("SELECT digest FROM sent WHERE trip_id=? AND check_at=?",
-                        (trip_id, check_at)).fetchone()
+        row = c.execute(
+            "SELECT digest FROM sent WHERE trip_id=? AND check_at=? AND endpoint=?",
+            (trip_id, check_at, endpoint)).fetchone()
     return bool(row and row["digest"] == digest)

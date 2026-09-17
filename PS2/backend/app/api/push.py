@@ -76,6 +76,10 @@ def send_push(subscription: dict, payload: dict) -> tuple[bool, str | None]:
     except Exception as exc:
         # Full detail to the server log, a bare code to the caller.
         log.warning("push to %s failed: %s", subscription.get("endpoint", "")[:60], exc)
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status in (404, 410):
+            # The browser discarded this subscription; it will never work again.
+            return False, "ENDPOINT_GONE"
         return False, "PUSH_FAILED"
 
 
