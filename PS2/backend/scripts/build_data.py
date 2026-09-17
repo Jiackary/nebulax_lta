@@ -47,6 +47,11 @@ CORRIDOR = {
     "outram": (1.2740, 103.8300, 1.2870, 103.8450),
 }
 
+# Coordinate precision for every derived artefact. 6 dp is ~11 cm at this
+# latitude — well inside the 8 m tolerance the shelter join uses and far finer
+# than OSM's own survey accuracy, so it costs nothing and shrinks the graph.
+COORD_DP = 6
+
 # Walkable highway values. `steps` is collected but never routed over (D11).
 WALKABLE = {
     "footway", "path", "pedestrian", "corridor", "steps", "living_street",
@@ -188,7 +193,7 @@ def build_stations() -> dict:
         stations[sid] = {
             "stop_code": r["stop_code"],
             "name": r["stop_name"],
-            "coord": [round(float(r["stop_lon"]), 7), round(float(r["stop_lat"]), 7)],
+            "coord": [round(float(r["stop_lon"]), COORD_DP), round(float(r["stop_lat"]), COORD_DP)],
             "codes": set(),
             "platforms": [],
             "entrances": [],
@@ -206,7 +211,7 @@ def build_stations() -> dict:
             st["entrances"].append({
                 "exit_code": r["stop_name"].strip().upper(),
                 "stop_id": r["stop_id"],
-                "coord": [round(float(r["stop_lon"]), 7), round(float(r["stop_lat"]), 7)],
+                "coord": [round(float(r["stop_lon"]), COORD_DP), round(float(r["stop_lat"]), COORD_DP)],
             })
     out = {}
     for sid, st in sorted(stations.items()):
@@ -355,7 +360,7 @@ def _shapefile_only_exits(stations: dict) -> list[dict]:
             else:
                 added.append({
                     "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [round(lon, 7), round(lat, 7)]},
+                    "geometry": {"type": "Point", "coordinates": [round(lon, COORD_DP), round(lat, COORD_DP)]},
                     "properties": {"station_id": sid, "stop_code": st["stop_code"],
                                    "station_name": st["name"], "exit_code": code,
                                    "source": "trainstationexit_jul2026"},
@@ -576,7 +581,7 @@ def build_osm_graph() -> tuple[dict, dict]:
         for el in payload["elements"]:
             tags = el.get("tags", {})
             if el["type"] == "node":
-                pt = [round(el["lon"], 7), round(el["lat"], 7)]
+                pt = [round(el["lon"], COORD_DP), round(el["lat"], COORD_DP)]
                 if tags.get("railway") in ("subway_entrance", "train_station_entrance"):
                     entrances.append({"osm_id": el["id"], "coord": pt,
                                       "ref": (tags.get("ref") or "").strip().upper(),
@@ -602,8 +607,8 @@ def build_osm_graph() -> tuple[dict, dict]:
                          "the Overpass query must use `out body geom`")
             for i, (a, b) in enumerate(zip(geom, geom[1:])):
                 na, nb = ids[i], ids[i + 1]
-                nodes[na] = [round(a["lon"], 7), round(a["lat"], 7)]
-                nodes[nb] = [round(b["lon"], 7), round(b["lat"], 7)]
+                nodes[na] = [round(a["lon"], COORD_DP), round(a["lat"], COORD_DP)]
+                nodes[nb] = [round(b["lon"], COORD_DP), round(b["lat"], COORD_DP)]
                 edges.append({
                     "u": na, "v": nb, "way": el["id"],
                     "len_m": round(_haversine(a["lat"], a["lon"], b["lat"], b["lon"]), 2),

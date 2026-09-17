@@ -12,3 +12,4 @@ PS2/backend/.venv/
 PS2/backend/data/cache/
 __pycache__/
 *.pyc
+PS2/backend/data/ps2.sqlite3
