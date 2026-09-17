@@ -124,7 +124,10 @@ async def build_status(trip: dict) -> dict:
 
     try:
         wx_fetched = await weather.nowcast.get()
-        wx = weather_policy.assess(wx_fetched.data, stale=bool(wx_fetched.stale))
+        wx = weather_policy.assess(
+            wx_fetched.data, stale=bool(wx_fetched.stale),
+            prefer_sheltered=bool((trip.get("preferences") or {}).get(
+                "prefer_sheltered", True)))
         wx["observed_at"] = wx_fetched.observed_iso
         wx_stale = wx_fetched.stale
     except Exception:

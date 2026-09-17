@@ -199,3 +199,24 @@ def test_an_all_test_feed_is_downgraded_and_shows_no_delay():
     assert result["severity"] == "warn"
     assert result["delay_min"] is None
     assert "test broadcast" in result["detail"]
+
+
+# --- F28 (partial): the rain sentence must match what the planner did -------
+
+WET = {"area_metadata": [
+    {"name": "Bedok", "label_location": {"latitude": 1.321, "longitude": 103.924}},
+    {"name": "City", "label_location": {"latitude": 1.292, "longitude": 103.851}},
+], "items": []}
+
+
+def test_the_rain_sentence_does_not_claim_shelter_that_was_not_requested(monkeypatch):
+    """"We have kept your walk covered" held only because prefer_sheltered
+    defaults to true; it was simply false when the preference was off."""
+    monkeypatch.setattr(weather_policy.weather, "is_wet", lambda _fc: True)
+
+    on = weather_policy.assess(WET, prefer_sheltered=True)["label"]
+    off = weather_policy.assess(WET, prefer_sheltered=False)["label"]
+
+    assert "already routed under shelter" in on
+    assert "not weighted towards shelter" in off
+    assert "We have kept your walk covered" not in off
