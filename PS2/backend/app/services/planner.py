@@ -138,7 +138,10 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
                                              alight_known),
             "step_free": _step_free(walk_out, alight_known),
             "surface_warnings": [],
-            "geometry": {"type": "LineString", "coordinates": walk_out.coords},
+            # `walk_out` is routed SGH -> exit, but this leg runs exit -> SGH.
+            # A frontend animating progress along the line ran it backwards (F33).
+            "geometry": {"type": "LineString",
+                         "coordinates": list(reversed(walk_out.coords))},
         },
     ]
 

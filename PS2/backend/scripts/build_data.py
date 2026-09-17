@@ -97,9 +97,21 @@ def _download_link(endpoint: str, dest: Path, params: dict | None = None) -> Non
         if not link:
             sys.exit(f"{endpoint}: neither `link` nor `Link` present; keys={list(row)}")
         blob = c.get(link)          # never log this URL — it carries an AWS token
-        blob.raise_for_status()
+        if blob.status_code != 200:
+            # raise_for_status() would put the full presigned URL, including
+            # X-Amz-Security-Token, into the traceback (F32). Tracebacks get
+            # pasted into chat and CI logs.
+            sys.exit(f"{endpoint}: download failed ({blob.status_code})")
         dest.write_bytes(blob.content)
     log(f"  {endpoint} -> {dest.name} ({dest.stat().st_size:,} bytes)")
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    """Write via a temp file and os.replace, so an interrupted run cannot leave
+    a half-written cache that later reads as valid (F34)."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text)
+    os.replace(tmp, path)
 
 
 def fetch_gtfs() -> None:
@@ -146,20 +158,26 @@ def _paged(client: httpx.Client, endpoint: str) -> list[dict]:
 
 
 def fetch_bus() -> None:
-    """BusRoutes + BusStops, for the accessible-bus alternative in D2.2."""
-    dest = CACHE / "bus_routes.json"
-    if dest.exists():
+    """BusRoutes + BusStops, for the accessible-bus alternative in D2.2.
+
+    Both files are written only after both fetches succeed, and the skip check
+    looks at both. Writing bus_routes.json first meant that if BusStops failed
+    once, every later `--all` run saw the cache as present, skipped the fetch,
+    and `build_bus_options` died with FileNotFoundError (F34).
+    """
+    routes_path, stops_path = CACHE / "bus_routes.json", CACHE / "bus_stops.json"
+    if routes_path.exists() and stops_path.exists():
         log("fetch: BusRoutes/BusStops — cached, skipping")
         return
     with httpx.Client(timeout=60) as c:
         log("fetch: BusRoutes (paged)")
         routes = _paged(c, "BusRoutes")
-        dest.write_text(json.dumps(routes))
         log(f"  {len(routes):,} route rows")
         log("fetch: BusStops (paged)")
         stops = _paged(c, "BusStops")
-        (CACHE / "bus_stops.json").write_text(json.dumps(stops))
         log(f"  {len(stops):,} stops")
+    _write_atomic(routes_path, json.dumps(routes))
+    _write_atomic(stops_path, json.dumps(stops))
 
 
 def fetch_overpass() -> None:

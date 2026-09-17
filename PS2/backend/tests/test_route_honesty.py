@@ -336,3 +336,32 @@ def test_a_truncated_fixture_does_not_become_a_500(fixture_dir, monkeypatch):
 
     with pytest.raises(RuntimeError, match="upstream down"):
         asyncio.run(source.get(client))
+
+
+# --- F33: leg geometry must run the way the leg reads ----------------------
+
+def _ends_run(leg):
+    """(start is nearer `from` than `to`, end is nearer `to` than `from`).
+
+    Compared by distance rather than equality: both ends are snapped to the
+    nearest graph node, so the line never starts exactly on the door.
+    """
+    from app.services.walking import haversine
+
+    def d(a, b):
+        return haversine(a[1], a[0], b[1], b[0])
+
+    coords = leg["geometry"]["coordinates"]
+    start, end = coords[0], coords[-1]
+    a, b = leg["from"]["coord"], leg["to"]["coord"]
+    return d(start, a) < d(start, b), d(end, b) < d(end, a)
+
+
+def test_the_last_walk_leg_geometry_runs_exit_to_hospital():
+    """`walk_out` is routed SGH -> exit, but the leg says from exit, to SGH, so
+    a frontend animating along the line ran it backwards."""
+    assert _ends_run(_plan()["legs"][2]) == (True, True)
+
+
+def test_the_first_walk_leg_geometry_runs_home_to_station():
+    assert _ends_run(_plan()["legs"][0]) == (True, True)
