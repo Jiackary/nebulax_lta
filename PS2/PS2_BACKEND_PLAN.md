@@ -265,25 +265,30 @@ must not imply otherwise. Wording: *"Checked 20:00. We'll check again at 07:00."
 
 ---
 
-## 9. Build order
+## 9. Build order and status
 
-Roughly two days of backend work with a half-day of margin. Numbered by dependency, not by day.
+Roughly two days of backend work with a half-day of margin. Stages are ordered by dependency,
+not by day.
 
-1. **Pipeline first** (§5). Nothing else is testable without `stations.json` and `exits.geojson`.
-   Includes the I3 rework of the matcher — do it here, not later.
-2. **Sources + cache** (§6) with recorded fixtures, so development does not hammer upstream and
-   the demo works offline.
-3. **Planner** — step-free Bedok → SGH with `timing.py` uncertainty. This is capability 1 and
-   everything else decorates it.
-4. **Lift matcher + reroute** — capability 2, the product's whole point.
-5. **Scenario layer** (§7) — must exist before the demo path is built on top of it.
-6. **Disruption alternatives** — capability 3, the biggest single service.
-7. **Push + scheduler** — capability 6.
-8. **Offline bundle + crowd + weather** — capabilities 4, 5, 7. Smallest, most cuttable.
-9. **`verify_stepfree.py`** (D11) and the D13 rule scoring — these produce the write-up's numbers,
-   so they must run before submission, not after.
+**Whoever implements a stage updates its row here in the same commit as the code.** Status is one
+of `not started` · `in progress` · `done` · `cut`. A stage is only `done` when it runs and has been
+exercised at least once against real data — not when the file exists. Put anything a later stage
+needs to know in the Notes column.
 
-D14's cut order if time runs short: taxi option → live bus checks → GTFS timing.
+| # | Stage | Delivers | Status | Notes |
+|---|---|---|---|---|
+| 1 | **Data pipeline** (§5) — `scripts/build_data.py` | `stations.json`, `exits.geojson`, `headways.json`, `stepfree_graph.json` | `not started` | Nothing else is testable without this. Includes the I3 matcher rework — do it here, not later. |
+| 2 | **Sources + cache** (§6) | `app/sources/*` with recorded fixtures | `not started` | Fixtures let dev run without hammering upstream, and make the demo survive a dead network. |
+| 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `not started` | Everything else decorates this. Timing range from headway + pace, never ride time (I1). |
+| 4 | **Lift matcher + reroute** | Capability 2 | `not started` | The product's whole point. Re-measure the §3.2 join rate here and report the new figure. |
+| 5 | **Scenario layer** (§7) | Labelled injection for D1/D2 | `not started` | Must exist before the demo path is built on top of it. |
+| 6 | **Disruption alternatives** | Capability 3 | `not started` | Biggest single service. Three options per D2, shown against the original. |
+| 7 | **Push + scheduler** | Capability 6 — 20:00 / 07:00 checks | `not started` | Include `POST /api/push/test` so judges need not wait. |
+| 8 | **Offline bundle + crowd + weather** | Capabilities 4, 5, 7 | `not started` | Smallest and most cuttable. Offline tiles are parked (I6) — ship `tile_pack_url: null`. |
+| 9 | **Claim scripts** | `verify_stepfree.py` (D11), `score_rules.py` (D13) | `not started` | These produce the write-up's numbers. Must run **before** submission, not after. |
+
+D14's cut order if time runs short: taxi option → live bus checks → GTFS headways (but keep
+`stations.json` — see D14 note).
 
 ---
 

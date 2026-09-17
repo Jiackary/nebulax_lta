@@ -410,3 +410,4 @@ python3 -m venv "$SP/venv"
 | What the privacy statement says | `PS2_DECISION_RECORD.md` §8 |
 | How the backend is built, and what's wrong with the record | `PS2_BACKEND_PLAN.md` |
 | What the API serves the frontend | `PS2_API_CONTRACT.md` |
+| Which backend stages are done | `PS2_BACKEND_PLAN.md` §9 — update it as you build |
