@@ -34,7 +34,7 @@ From D14's never-cut list, the backend owes the frontend seven things:
 Raised rather than worked around. Four are factual corrections; four are gaps to close.
 
 **Status as of 17 Sep 2026:** I1 and I2 are **resolved** — D8 was amended in the decision record
-(commit `c5032ef`, see its §7.3). I3 is **partly applied**: D8 now names `parent_station` as the better key,
+(see D8 in its §7.3). I3 is **partly applied**: D8 now names `parent_station` as the better key,
 but D7's matcher description is unchanged and the 2/4 join figure in §3.2 has not been
 re-measured. I6 is **parked** at the team's direction. I4, I5, I7 and I8 are open.
 
