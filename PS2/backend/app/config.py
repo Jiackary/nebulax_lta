@@ -38,7 +38,9 @@ WEATHER = "https://api-open.data.gov.sg/v2/real-time/api"
 ONEMAP = "https://www.onemap.gov.sg/api"
 
 # Her trip. One persona, one journey (D14) — these are not user-configurable.
-HOME_DEFAULT = {"label": "Blk 123 Bedok North Street 2", "coord": [103.9373, 1.329190]}
+# A real address, geocoded through OneMap, 284 m step-free from Bedok Exit B.
+# The API contract's example coordinate did not match the address it named.
+HOME_DEFAULT = {"label": "Blk 208B New Upper Changi Road", "coord": [103.930570, 1.324782]}
 SGH = {"label": "Singapore General Hospital", "coord": [103.835541, 1.279643],
        "block": "Block 3", "area": "outram"}
 ORIGIN_STATION = "EW5"

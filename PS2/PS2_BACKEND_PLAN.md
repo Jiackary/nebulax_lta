@@ -93,6 +93,28 @@ this change and update §3.2, §6 limitation 2 and trap T21 with whatever it bec
 > large: it keys on `stop_code` (kills the name join, T21) and ships WGS84 (kills the SVY21
 > reprojection, T19).
 
+### I12 — The contract's example home coordinate is not that address · **fixed**
+
+`PS2_API_CONTRACT.md` §3 shows origin `"Blk 123 Bedok North St 2"` at `[103.9312, 1.3271]`,
+about 340 m from Bedok station. Geocoded through OneMap, that address is actually at
+`[103.9373, 1.32919]` — **1,364 m by step-free foot route, a 32-minute walk at 0.7 m/s**. The
+coordinate and the label describe different places, and the walk the label implies is not one
+this persona would make.
+
+Her home is now **Blk 208B New Upper Changi Road** `[103.930570, 1.324782]`, a real address
+returned by OneMap, **284 m step-free from Bedok Exit B** (7 min at her pace). Set in
+`config.HOME_DEFAULT`. The contract's worked example should be refreshed to match.
+
+### I13 — Summing consecutive segment times silently drops dwell · **measured**
+
+`ridetimes.json` first stored only consecutive-station segments. Summing them for EW5→EW16 gives
+**24.00 min**, against the **30.67 min** the same feed reports end to end — because a segment is
+`arrival[b] − departure[a]` and so omits the **40 s dwell at each of the 10 intermediate
+stations** (10 × 40 s = 6.67 min, exactly the gap).
+
+The artefact now carries a `_pairs` block with 7,484 ordered station pairs measured end to end,
+and the planner reads that. Anything quoting a station-to-station time must use `_pairs`.
+
 ### I9 — OneMap needs a token, and the DataMall key is not it · **resolved, token supplied**
 
 Plan §4 lists `sources/onemap.py` but nothing said where the credential comes from. Measured
@@ -328,7 +350,7 @@ needs to know in the Notes column.
 |---|---|---|---|---|
 | 1 | **Data pipeline** (§5) — `scripts/build_data.py` | `stations.json`, `line_codes.json`, `exits.geojson`, `ridetimes.json`, `headways.json`, `stepfree_graph.json`, `covered_ways.geojson` | `done` | Run 17 Sep against live feeds; outputs committed under `backend/data/derived/`. Reproduces both recorded figures exactly: EW5→EW16 is 30.67 min across all 698 trips (I1/T24), EW5 weekday headway 2.5 min at 08h / 5.0 off-peak (D8). **For later stages:** exits are a 603-row union, `source` per feature (I10); snap walking legs via `components` + `main_component_by_area` or you will land on one of 112 two-node stubs (I11); shelter is LTA `CoveredLinkWay` ∪ OSM tags. |
 | 2 | **Sources + cache** (§6) | `app/sources/*` with recorded fixtures | `done` | All five adapters exercised live 17 Sep. Fixtures auto-record to `backend/data/fixtures/` on every successful fetch; `PS2_USE_FIXTURES=1` runs the whole backend with no network. Verified three degradation paths: fixtures-only, upstream-unreachable→fixture, and both auth failures. **T18 was re-measured and corrected** — a wrong key gives 401, a missing key gives the ambiguous 404. |
-| 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `not started` | Everything else decorates this. Timing range from headway + pace, never ride time (I1). |
+| 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `done` | Serves `POST/GET/DELETE /api/trips`, `/api/places/search`, `/api/health`, `/api/attribution`. Plan for a 10:30 appointment: **leave 09:19, arrive 10:03–10:14**, 696 m walking, step-free, 60% sheltered. Range narrows correctly at peak (44–52 min at 08:30 vs 44–55 off-peak) because the only live input is headway. **For later stages:** her home is now a real geocoded address (I12); ride time must come from `ridetimes._pairs`, not summed segments (I13); `services/lifts.py` is a stub that stage 4 replaces. |
 | 4 | **Lift matcher + reroute** | Capability 2 | `not started` | The product's whole point. Re-measure the §3.2 join rate here and report the new figure. |
 | 5 | **Scenario layer** (§7) | Labelled injection for D1/D2 | `not started` | Must exist before the demo path is built on top of it. |
 | 6 | **Disruption alternatives** | Capability 3 | `not started` | Biggest single service. Three options per D2, shown against the original. |

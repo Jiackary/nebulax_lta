@@ -412,6 +412,10 @@ def build_ridetimes(stations: dict) -> dict:
     seg: dict[tuple, list[float]] = defaultdict(list)
     seq: dict[tuple, list[str]] = {}
     pair_ew: list[float] = []
+    # End-to-end times per ordered station pair. Summing consecutive segments
+    # under-counts by the dwell at every intermediate stop (40 s each on the EWL,
+    # which is 6.7 min across her 11-stop ride), so pairs are measured directly.
+    pairs: dict[tuple, list[float]] = defaultdict(list)
     for tid, rows in by_trip.items():
         t = trips.get(tid)
         if not t:
@@ -419,10 +423,18 @@ def build_ridetimes(stations: dict) -> dict:
         rows.sort(key=lambda r: int(r["stop_sequence"]))
         key = (t["route_id"], t["direction_id"])
         codes = [r["stop_id"].rsplit("_", 1)[0] for r in rows]
-        seq.setdefault(key, codes)
+        # Keep the longest observed sequence: plenty of trips start mid-line, so
+        # the first one seen is not the canonical stop order.
+        if len(codes) > len(seq.get(key, ())):
+            seq[key] = codes
         for a, b in zip(rows, rows[1:]):
             ca, cb = a["stop_id"].rsplit("_", 1)[0], b["stop_id"].rsplit("_", 1)[0]
             seg[(key, ca, cb)].append((hhmmss(b["arrival_time"]) - hhmmss(a["departure_time"])) / 60)
+        for i, a in enumerate(rows):
+            dep = hhmmss(a["departure_time"])
+            ca = codes[i]
+            for j in range(i + 1, len(rows)):
+                pairs[(key[0], ca, codes[j])].append((hhmmss(rows[j]["arrival_time"]) - dep) / 60)
         # her leg, measured end to end across every trip that serves it
         pos = {c: i for i, c in enumerate(codes)}
         if "EW5" in pos and "EW16" in pos and pos["EW5"] < pos["EW16"]:
@@ -430,10 +442,19 @@ def build_ridetimes(stations: dict) -> dict:
             arr = hhmmss(rows[pos["EW16"]]["arrival_time"])
             pair_ew.append((arr - dep) / 60)
 
+    headsigns: dict[tuple, Counter] = defaultdict(Counter)
+    for tid in by_trip:
+        t = trips.get(tid)
+        if t and t.get("trip_headsign"):
+            headsigns[(t["route_id"], t["direction_id"])][t["trip_headsign"]] += 1
+
     out = {}
     for (key, ca, cb), vals in seg.items():
         route, direction = key
-        out.setdefault(route, {}).setdefault(direction, {"stops": seq[key], "segments": {}})
+        out.setdefault(route, {}).setdefault(direction, {
+            "stops": seq[key], "segments": {},
+            "headsign": (headsigns[key].most_common(1) or [("", 0)])[0][0],
+        })
         out[route][direction]["segments"][f"{ca}>{cb}"] = {
             "min": round(min(vals), 2), "median": round(statistics.median(vals), 2),
             "max": round(max(vals), 2), "trips": len(vals),
@@ -444,7 +465,17 @@ def build_ridetimes(stations: dict) -> dict:
         "max": round(max(pair_ew), 2),
         "note": "Scheduled ride time, not a stopwatch. Fixed across all trips (I1/T24).",
     }
+    pair_out: dict = {}
+    for (route, a, b), vals in pairs.items():
+        pair_out.setdefault(route, {})[f"{a}>{b}"] = {
+            "min": round(min(vals), 2), "median": round(statistics.median(vals), 2),
+            "max": round(max(vals), 2), "trips": len(vals),
+        }
+    out["_pairs"] = pair_out
     out["_claims"] = {"ew5_ew16": claim}
+    log(f"  end-to-end pairs: {sum(len(v) for v in pair_out.values()):,} across "
+        f"{len(pair_out)} routes (EWL EW5>EW16 = "
+        f"{pair_out['EWL']['EW5>EW16']['median']} min, includes dwell)")
     log(f"ridetimes.json: {claim['trips']} EW5>EW16 trips, "
         f"min {claim['min']} / median {claim['median']} / max {claim['max']} min")
     spread = claim["max"] - claim["min"]
