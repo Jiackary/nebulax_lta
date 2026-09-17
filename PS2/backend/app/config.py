@@ -29,6 +29,12 @@ ONEMAP_TOKEN = os.environ.get("ONEMAP_TOKEN", "").strip()
 # this automatically when an upstream dies; setting it forces the offline path.
 USE_FIXTURES = os.environ.get("PS2_USE_FIXTURES", "").lower() in ("1", "true", "yes")
 
+# Recording is opt-in. It used to happen on every successful fetch, which
+# rewrote committed fixtures into the git tree while the demo was running, and
+# let one empty out-of-hours response overwrite a good one (F12). Set this only
+# when deliberately refreshing the fixtures.
+RECORD_FIXTURES = os.environ.get("PS2_RECORD_FIXTURES", "").lower() in ("1", "true", "yes")
+
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:ps2@example.org").strip()

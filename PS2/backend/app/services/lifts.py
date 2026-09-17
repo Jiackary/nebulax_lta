@@ -170,10 +170,10 @@ def blocked_exits(alerts: list[dict]) -> tuple[dict[str, set[str]], dict]:
     return blocked, {}
 
 
-async def current_alerts() -> tuple[list[dict], object]:
+async def current_alerts(*, allow_simulated: bool = True) -> tuple[list[dict], object]:
     """Live outages (plus any labelled synthetic ones) matched and annotated."""
     from ..scenario import lift_rows
-    rows, fetched = await lift_rows()
+    rows, fetched = await lift_rows(allow_simulated=allow_simulated)
     return annotate_for_route(match_all(rows)), fetched
 
 

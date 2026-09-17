@@ -6,6 +6,7 @@ so the app starts with no network and a judge sees the same numbers we did.
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -126,8 +127,66 @@ class WalkGraph:
             self._by_area[key] = [n for n in G.nodes if self.component.get(n) == want]
         return self._by_area[key]
 
-    def entrances_for(self, area: str) -> dict[str, dict]:
-        return {e["ref"]: e for e in self.entrances if e["ref"] and e["area"] == area}
+    def station_of_entrance(self, ent: dict) -> str | None:
+        """Which station an OSM entrance belongs to (F08).
+
+        A corridor bbox holds more than one station, so keying entrances by the
+        bare `ref` let Chinatown's Exit C and Cantonment's Exit 2 stand in for
+        Outram Park's. OSM names most entrances after their station
+        ("Outram Park", "Chinatown (C)"), so the name decides it. Only genuinely
+        unnamed ones fall back to the nearest station — and with no radius cut-off,
+        because Outram Exit 6, the door her plan actually uses, is 276 m from the
+        station centroid and a 250 m rule would discard it.
+        """
+        if not hasattr(self, "_ent_station"):
+            self._ent_station = {}
+        key = ent["osm_id"]
+        if key in self._ent_station:
+            return self._ent_station[key]
+
+        from .services.walking import haversine
+        in_area = [(sid, st) for sid, st in stations().items()
+                   if self.area_of(*st["coord"]) == ent["area"]]
+        name = re.sub(r"\s*\(.*\)\s*$", "", (ent.get("name") or "")).strip().casefold()
+        found = None
+        if name:
+            found = next((sid for sid, st in in_area
+                          if st["name"].casefold() == name), None)
+        if found is None and in_area:
+            lon, lat = ent["coord"]
+            found = min(in_area,
+                        key=lambda p: haversine(lat, lon, p[1]["coord"][1],
+                                                p[1]["coord"][0]))[0]
+        self._ent_station[key] = found
+        return found
+
+    def entrances_for(self, area: str, station_id: str | None = None) -> dict[str, dict]:
+        """Entrances in `area`, keyed by ref — restricted to one station's own.
+
+        Without `station_id` this is the old behaviour and still mixes stations;
+        every caller that decides where she may walk passes it.
+        """
+        from .services.walking import haversine
+        out: dict[str, dict] = {}
+        for e in self.entrances:
+            if not e["ref"] or e["area"] != area:
+                continue
+            if station_id is not None and self.station_of_entrance(e) != station_id:
+                continue
+            prior = out.get(e["ref"])
+            if prior is None:
+                out[e["ref"]] = e
+                continue
+            # Same ref twice within one station: keep the one at the station.
+            st = stations().get(self.station_of_entrance(e) or "")
+            if not st:
+                continue
+            d = (haversine(st["coord"][1], st["coord"][0], e["coord"][1], e["coord"][0]),
+                 haversine(st["coord"][1], st["coord"][0],
+                           prior["coord"][1], prior["coord"][0]))
+            if d[0] < d[1]:
+                out[e["ref"]] = e
+        return out
 
 
 @lru_cache(maxsize=1)

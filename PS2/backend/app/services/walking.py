@@ -90,24 +90,33 @@ def route(origin: list[float], dest: list[float], area: str, *,
 
 
 def choose_entrance(target: list[float], area: str, *, blocked: set[str] | None = None,
-                    prefer_sheltered: bool = False) -> tuple[str, Walk, dict] | None:
+                    prefer_sheltered: bool = False,
+                    station_id: str | None = None) -> tuple[str, Walk, dict] | None:
     """Pick the entrance giving the shortest step-free walk.
 
     Excludes anything OSM tags `wheelchair=no` — a useful negative, e.g. Outram
     Park exit 5 — and anything `blocked` (a lift outage, from D7). An entrance
     with no wheelchair tag is *unknown*, not unusable: OSM coverage is 60%
     island-wide (§6 limitation 5).
+
+    An entrance OSM tags `wheelchair=yes` is preferred over an untagged one even
+    when the untagged one is nearer (F11): with Outram Exit 6 out, the shortest
+    walk was the untagged Exit 7 at 555 m, and sending her there while claiming
+    `step_free: "yes"` asserts something nobody checked. The tagged Exit 1 at
+    635 m costs about a minute and is known to work.
     """
     wg = data.walk_graph()
     blocked = blocked or set()
     best = None
-    for ref, ent in wg.entrances_for(area).items():
+    for ref, ent in wg.entrances_for(area, station_id).items():
         if ref in blocked or ent.get("wheelchair") == "no":
             continue
         walk = route(target, ent["coord"], area, step_free=True,
                      prefer_sheltered=prefer_sheltered)
         if walk is None:
             continue
-        if best is None or walk.distance_m < best[1].distance_m:
-            best = (ref, walk, ent)
-    return best
+        # Known-accessible first, then shortest.
+        rank = (0 if ent.get("wheelchair") == "yes" else 1, walk.distance_m)
+        if best is None or rank < best[0]:
+            best = (rank, ref, walk, ent)
+    return None if best is None else best[1:]

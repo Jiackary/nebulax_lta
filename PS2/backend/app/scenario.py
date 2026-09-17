@@ -80,18 +80,22 @@ def _on(name: str) -> bool:
     return _state["enabled"] and _state[name]
 
 
-async def lift_rows() -> tuple[list[dict], object]:
-    """Live outages, with the simulated one appended and labelled when armed."""
+async def lift_rows(*, allow_simulated: bool = True) -> tuple[list[dict], object]:
+    """Live outages, with the simulated one appended and labelled when armed.
+
+    `allow_simulated=False` is the real-delivery path: the flag is process-wide
+    and needs no auth, so a scheduled push must never be able to read it (F09).
+    """
     fetched = await datamall.lifts.get()
     rows = [{**r, "_source": "live"} for r in fetched.data]
-    if _on("lift_outage_outram"):
+    if allow_simulated and _on("lift_outage_outram"):
         rows.append(dict(SIMULATED_LIFT))
     return rows, fetched
 
 
-async def alert_value() -> tuple[dict, object]:
+async def alert_value(*, allow_simulated: bool = True) -> tuple[dict, object]:
     """TrainServiceAlerts, replaced wholesale by the replay when armed."""
     fetched = await datamall.alerts.get()
-    if _on("ewl_disruption"):
+    if allow_simulated and _on("ewl_disruption"):
         return dict(SIMULATED_ALERT), fetched
     return {**fetched.data, "_source": "live"}, fetched

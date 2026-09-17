@@ -24,10 +24,21 @@ import pytest  # noqa: E402
 from app.sources.base import Source  # noqa: E402
 
 
+# The real implementation, for the few tests that are *about* recording. They
+# must point FIXTURES at a temp directory first.
+REAL_RECORD = Source._record
+
+
 @pytest.fixture(autouse=True)
 def never_write_fixtures(monkeypatch):
     """No test may rewrite a committed fixture."""
     monkeypatch.setattr(Source, "_record", lambda self, value, observed: None)
+
+
+@pytest.fixture
+def recording_enabled(monkeypatch):
+    """Restore the real `_record`. Only safe with FIXTURES redirected."""
+    monkeypatch.setattr(Source, "_record", REAL_RECORD)
 
 
 @pytest.fixture(autouse=True)

@@ -45,7 +45,7 @@ def route_key(plan: dict) -> list:
     return [doors, plan.get("summary", {}).get("leave_by")]
 
 
-async def refresh_plan(trip: dict, alerts: list[dict]) -> bool:
+async def refresh_plan(trip: dict, alerts: list[dict]) -> tuple[bool, bool]:
     """Derive the effective plan for the outages known right now (D7, F07).
 
     The stored `plan_original` is never overwritten, and the effective plan is
@@ -53,38 +53,53 @@ async def refresh_plan(trip: dict, alerts: list[dict]) -> bool:
     a reroute reversible: when the outage clears, the next call plans with no
     blocked exits and lands back on the original.
 
-    Returns whether the effective plan differs from the original — "we moved
-    you" is a statement about the route she is being given, not about whether
-    *this* call happened to re-plan.
+    Returns `(rerouted, replan_failed)`. "We moved you" is a statement about the
+    route she is being given, not about whether *this* call happened to re-plan.
+
+    A re-plan that finds no usable entrance used to raise straight out of
+    `/status` as a 500 (F06). It is reported instead, because the interesting
+    case — every step-free door at her station out — is precisely when she most
+    needs an answer.
     """
     blocked, access = lift_service.blocked_exits(alerts)
     signature = _blocked_signature(blocked)
     if trip["plan"].get("blocked_signature") == signature:
-        return bool(trip["plan"].get("rerouted"))
+        return bool(trip["plan"].get("rerouted")), bool(trip["plan"].get("replan_failed"))
 
     original = trip.get("plan_original") or trip["plan"]
     from ..services import planner
     prefs = trip.get("preferences") or {}
     appointment = datetime.fromisoformat(original["appointment_at"])
-    plan = planner.plan_trip(
-        trip["origin"], appointment,
-        pace=prefs.get("walking_pace", "slow"),
-        buffer_min=prefs.get("buffer_min", planner.DEFAULT_BUFFER_MIN),
-        prefer_sheltered=prefs.get("prefer_sheltered", False),
-        blocked_exits=blocked, access=access)
+    try:
+        plan = planner.plan_trip(
+            trip["origin"], appointment,
+            pace=prefs.get("walking_pace", "slow"),
+            buffer_min=prefs.get("buffer_min", planner.DEFAULT_BUFFER_MIN),
+            prefer_sheltered=prefs.get("prefer_sheltered", False),
+            blocked_exits=blocked, access=access)
+    except RuntimeError:
+        # Keep the last plan she has, but never let it read as safe.
+        plan = dict(trip["plan"])
+        plan["rerouted"] = bool(plan.get("rerouted"))
+        plan["replan_failed"] = True
+        plan["blocked_signature"] = signature
+        trip["plan"] = plan
+        store.update_plan(trip["trip_id"], plan)
+        return plan["rerouted"], True
 
     rerouted = route_key(plan) != route_key(original)
     plan["rerouted"] = rerouted
+    plan["replan_failed"] = False
     plan["blocked_signature"] = signature
     trip["plan"] = plan
     store.update_plan(trip["trip_id"], plan)
-    return rerouted
+    return rerouted, False
 
 
 async def build_status(trip: dict) -> dict:
     now = datetime.now(SGT)
     alerts, lifts_fetched = await lift_service.current_alerts()
-    rerouted = await refresh_plan(trip, alerts)
+    rerouted, replan_failed = await refresh_plan(trip, alerts)
     alert_value, alerts_fetched = await scenario.alert_value()
 
     for a in alerts:
@@ -112,7 +127,7 @@ async def build_status(trip: dict) -> dict:
     except Exception:
         wx, wx_stale = None, True
 
-    overall = _overall(alerts, disruption, wx, rerouted, trip["plan"])
+    overall = _overall(alerts, disruption, wx, rerouted, trip["plan"], replan_failed)
     return {
         "trip_id": trip["trip_id"],
         "overall": overall,
@@ -126,13 +141,15 @@ async def build_status(trip: dict) -> dict:
             "label": f"Checked {now:%H:%M}. We'll check again at {_next_check(now):%H:%M}.",
         },
         "rerouted": rerouted,
+        "replan_failed": replan_failed,
         "stale": bool(lifts_fetched.stale or alerts_fetched.stale or crowd_stale or wx_stale),
         "observed_at": lifts_fetched.observed_iso,
     }
 
 
 def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None,
-             rerouted: bool = False, plan: dict | None = None) -> dict:
+             rerouted: bool = False, plan: dict | None = None,
+             replan_failed: bool = False) -> dict:
     """The one line that must be readable in a second (API contract §4).
 
     "Your route does not use it" is a safety claim, so it is only made where it
@@ -142,6 +159,16 @@ def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None,
     Outram Park is a three-line interchange, so a concourse lift there may well
     be on her step-free route. Those say so and ask her to check.
     """
+    if replan_failed:
+        # Every step-free door we know is out. This outranks everything else.
+        return {
+            "severity": "critical",
+            "headline": "We cannot find a step-free way into your station.",
+            "detail": ("The lifts we know about at your station are out of service and we "
+                       "could not find another step-free entrance. The steps below are your "
+                       "last plan and may not be usable. Please check before you go."),
+            "action": {"kind": "view_alternatives", "label": "See your options"},
+        }
     if disruption:
         return {
             "severity": disruption["severity"],

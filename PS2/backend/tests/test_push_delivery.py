@@ -33,7 +33,7 @@ def test_scheduled_check_only_sends_to_subscriptions_for_that_trip(monkeypatch):
         ],
     )
 
-    async def check_trip(_):
+    async def check_trip(_, **kwargs):
         return _payload()
 
     monkeypatch.setattr(jobs.notify, "check_trip", check_trip)
@@ -65,7 +65,7 @@ def test_failed_delivery_is_not_marked_sent(monkeypatch):
         lambda: [{"endpoint": "matching", "keys": {}, "trip_ids": ["t_one"]}],
     )
 
-    async def check_trip(_):
+    async def check_trip(_, **kwargs):
         return _payload()
 
     monkeypatch.setattr(jobs.notify, "check_trip", check_trip)
@@ -94,7 +94,7 @@ def test_partial_delivery_failure_is_not_marked_sent(monkeypatch):
         ],
     )
 
-    async def check_trip(_):
+    async def check_trip(_, **kwargs):
         return _payload()
 
     monkeypatch.setattr(jobs.notify, "check_trip", check_trip)
@@ -124,7 +124,7 @@ def test_unchanged_warning_is_not_sent_again(monkeypatch):
         lambda: [{"endpoint": "matching", "keys": {}, "trip_ids": ["t_one"]}],
     )
 
-    async def check_trip(_):
+    async def check_trip(_, **kwargs):
         return _payload()
 
     monkeypatch.setattr(jobs.notify, "check_trip", check_trip)
@@ -153,7 +153,7 @@ def test_manual_push_only_sends_to_subscriptions_for_selected_trip(monkeypatch):
         ],
     )
 
-    async def check_trip(_):
+    async def check_trip(_, **kwargs):
         return _payload()
 
     monkeypatch.setattr(push.notify, "check_trip", check_trip)

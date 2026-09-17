@@ -43,18 +43,33 @@ async def offline_bundle(trip_id: str):
             "retryable": False}})
     trip["trip_id"] = trip_id
     now = datetime.now(SGT)
+    warnings: list[str] = []
     try:
         snapshot = await build_status(trip)   # may re-plan around a new outage
     except Exception:
         snapshot = None
 
     plan = trip["plan"]          # refresh_plan may have replaced this during build_status
+
+    # Never hand her written steps with no idea whether they still hold (F06).
+    # Walking her through a door whose lift is out is the failure this bundle
+    # exists to prevent, so the absence of a check is itself the warning.
+    if snapshot is None:
+        warnings.append("We could not check for lift outages or delays just now. "
+                        "These steps are your last plan and may be out of date.")
+    else:
+        if snapshot.get("replan_failed"):
+            warnings.append(snapshot["overall"]["detail"])
+        elif snapshot["overall"]["severity"] in ("warn", "critical"):
+            warnings.append(snapshot["overall"]["detail"])
+
     return {
         "trip_id": trip_id,
         "generated_at": now.isoformat(timespec="seconds"),
         "plan": plan,
         "status_snapshot": snapshot,
-        "steps_plain": steps_plain(plan),
+        "warnings": warnings,
+        "steps_plain": (warnings + steps_plain(plan)) if warnings else steps_plain(plan),
         "tiles": {
             "style_url": None,
             "tile_pack_url": None,

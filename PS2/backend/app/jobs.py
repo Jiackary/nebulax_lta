@@ -28,7 +28,8 @@ async def run_check(label: str, horizon_hours: int) -> dict:
     subs = store.subscriptions()
     sent = skipped = 0
     for trip in trips:
-        payload = await notify.check_trip(trip)
+        # Scheduled pushes are real deliveries: never the demo scenario (F09).
+        payload = await notify.check_trip(trip, allow_simulated=False)
         if not payload:
             continue
         if store.was_sent(trip["trip_id"], label, payload["digest"]):

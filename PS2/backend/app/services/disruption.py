@@ -42,6 +42,68 @@ def parse_delay(text: str) -> tuple[int | None, str | None]:
     return int(m.group(1)), sentence
 
 
+# "NSL - … . EWL - …": one Content bundles several lines (T6). A line code
+# followed by a dash starts that line's clause.
+LINE_CLAUSE_RE = re.compile(r"(?:^|(?<=[.;:]))\s*([A-Z]{2,4})\s*-\s+")
+TOWARDS_RE = re.compile(r"towards\s+([A-Za-z' ]+?)\s*(?:[.,;]|$)", re.I)
+# Her westbound ride. The headsign the EWL uses for it.
+HER_HEADSIGN = "tuas link"
+
+
+def line_clauses(content: str) -> list[tuple[str | None, str]]:
+    """Split one Content into (line code, text) clauses.
+
+    Text before the first line marker keeps `None` — a bare advisory with no
+    line prefix still has to be readable.
+    """
+    text = content or ""
+    marks = list(LINE_CLAUSE_RE.finditer(text))
+    if not marks:
+        return [(None, text)]
+    out = []
+    if marks[0].start() > 0:
+        out.append((None, text[:marks[0].start()]))
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        out.append((m.group(1).upper(), text[m.end():end]))
+    return out
+
+
+def clause_is_hers(clause: str) -> bool:
+    """Does this clause describe the direction she travels?
+
+    A clause naming the other headsign is not hers; one naming no direction
+    could be either, so it counts (§6: warn rather than miss).
+    """
+    m = TOWARDS_RE.search(clause)
+    if not m:
+        return True
+    towards = m.group(1).strip().casefold()
+    return towards in (HER_HEADSIGN, "both")
+
+
+def delay_for_line(content: str, line: str) -> tuple[int | None, str | None]:
+    """The delay figure stated for *her* line and direction (F10).
+
+    Taking the first figure in the message let an NSL advisory set the delay for
+    an EWL trip, and that number drives the push body and the leave-earlier
+    advice.
+    """
+    clauses = line_clauses(content)
+    tagged = [c for c in clauses if c[0] is not None]
+    for code, text in clauses:
+        if code is not None and code != line:
+            continue
+        if code is None and tagged:
+            continue            # untagged preamble, e.g. "1820hrs : "
+        if not clause_is_hers(text):
+            continue
+        delay, basis = parse_delay(text)
+        if delay:
+            return delay, basis
+    return None, None
+
+
 def _segments(value: dict) -> list[dict]:
     """Segments that actually name stations. T3: recovery leaves empty ones."""
     return [s for s in (value.get("AffectedSegments") or [])
@@ -71,7 +133,7 @@ def assess(value: dict, observed_at: str) -> dict | None:
     seg, line, stations = mine[0]
     delay, basis = None, None
     for m in _messages(value):
-        delay, basis = parse_delay(m.get("Content", ""))
+        delay, basis = delay_for_line(m.get("Content", ""), line)
         if delay:
             break
 

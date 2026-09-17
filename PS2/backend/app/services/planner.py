@@ -49,16 +49,29 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
 
     first = walking.choose_entrance(origin_coord, area_from,
                                     blocked=blocked.get(ORIGIN_STATION),
-                                    prefer_sheltered=prefer_sheltered)
+                                    prefer_sheltered=prefer_sheltered,
+                                    station_id=_station(ORIGIN_STATION)["station_id"])
     last = walking.choose_entrance(SGH["coord"], SGH["area"],
                                    blocked=blocked.get(DEST_STATION),
-                                   prefer_sheltered=prefer_sheltered)
+                                   prefer_sheltered=prefer_sheltered,
+                                   station_id=_station(DEST_STATION)["station_id"])
     if not first or not last:
         raise RuntimeError("no step-free walking route to a usable entrance")
     board_exit, walk_in, board_ent = first
     alight_exit, walk_out, alight_ent = last
     if walk_in.snap_m > MAX_ORIGIN_SNAP_M:
         raise RuntimeError("origin is outside the supported Bedok walking area")
+
+    # `step_free` is a claim, and "unknown" is not "no" (contract §6 limitation 5,
+    # D11). A walk with no staircase edge over a door nobody has tagged is not
+    # known to be step-free, so it says unknown rather than yes (F11).
+    board_known = board_ent.get("wheelchair") == "yes"
+    alight_known = alight_ent.get("wheelchair") == "yes"
+
+    def _step_free(walk, entrance_known: bool) -> str:
+        if walk.steps_used:
+            return "no"
+        return "yes" if entrance_known else "unknown"
 
     ride = timing.ride_minutes(RAIL_ROUTE, ORIGIN_STATION, DEST_STATION)
     ride_min, ride_spread = ride if ride else (None, None)
@@ -89,7 +102,7 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
             "covered_m": round(walk_in.covered_m),
             "instruction": _walk_sentence(walk_in, _station(ORIGIN_STATION)["name"],
                                           board_exit, prefer_sheltered),
-            "step_free": "yes" if walk_in.steps_used == 0 else "no",
+            "step_free": _step_free(walk_in, board_known),
             "surface_warnings": [],
             "geometry": {"type": "LineString", "coordinates": walk_in.coords},
         },
@@ -101,10 +114,14 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
             "duration_min": round(ride_min) if ride_min else None,
             "headway_min": headway,
             "instruction": f"Take the {line['name']} towards {headsign}. {n_stops} stops.",
-            "step_free": "yes",
+            # Station interiors are not mapped (§6 limitation 8), so this can be
+            # no stronger than what is known about the two doors (F11).
+            "step_free": "yes" if (board_known and alight_known) else "unknown",
             "access": access or {
-                "board_at": {"exit_code": f"Exit {board_exit}", "status": "unknown"},
-                "alight_at": {"exit_code": f"Exit {alight_exit}", "status": "unknown"},
+                "board_at": {"exit_code": f"Exit {board_exit}",
+                             "status": "yes" if board_known else "unknown"},
+                "alight_at": {"exit_code": f"Exit {alight_exit}",
+                              "status": "yes" if alight_known else "unknown"},
             },
             "geometry": {"type": "LineString",
                          "coordinates": [_station(ORIGIN_STATION)["coord"],
@@ -117,8 +134,9 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
             "duration_min": round(walk_out_r.nominal),
             "distance_m": round(walk_out.distance_m),
             "covered_m": round(walk_out.covered_m),
-            "instruction": _arrival_sentence(walk_out, alight_exit, prefer_sheltered),
-            "step_free": "yes" if walk_out.steps_used == 0 else "no",
+            "instruction": _arrival_sentence(walk_out, alight_exit, prefer_sheltered,
+                                             alight_known),
+            "step_free": _step_free(walk_out, alight_known),
             "surface_warnings": [],
             "geometry": {"type": "LineString", "coordinates": walk_out.coords},
         },
@@ -141,7 +159,8 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
             "range_min": [round(total.fast), round(total.slow)],
             "timing_basis": timing.basis_sentence(ride_min, ride_spread, headway,
                                                   pace, total_walk_m),
-            "step_free": "yes" if (walk_in.steps_used == 0 and walk_out.steps_used == 0) else "no",
+            "step_free": ("no" if (walk_in.steps_used or walk_out.steps_used)
+                          else "yes" if (board_known and alight_known) else "unknown"),
             "sheltered_pct": round(100 * total_cov_m / total_walk_m) if total_walk_m else 0,
             "walk_distance_m": round(total_walk_m),
         },
@@ -166,8 +185,13 @@ def _walk_sentence(walk: walking.Walk, station: str, exit_code: str, sheltered: 
     return s
 
 
-def _arrival_sentence(walk: walking.Walk, exit_code: str, sheltered: bool) -> str:
-    s = (f"Leave by Exit {exit_code} and take the lift to street level. "
+def _arrival_sentence(walk: walking.Walk, exit_code: str, sheltered: bool,
+                      entrance_known: bool = True) -> str:
+    # Only promise a lift where the door is tagged accessible (F11).
+    lift = ("and take the lift to street level" if entrance_known
+            else "and look for the lift to street level — we could not confirm "
+                 "this exit has one")
+    s = (f"Leave by Exit {exit_code} {lift}. "
          f"Walk {walk.distance_m:.0f} m to {SGH['label']}, {SGH['block']}.")
     if walk.sheltered_pct >= 60:
         s += " Sheltered most of the way."

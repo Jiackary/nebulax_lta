@@ -20,12 +20,20 @@ from .. import scenario
 from . import disruption as disruption_service
 
 
-async def check_trip(trip: dict) -> dict | None:
-    """-> the push payload if something on her route changed, else None."""
-    alerts, _ = await lift_service.current_alerts()
+async def check_trip(trip: dict, *, allow_simulated: bool = True) -> dict | None:
+    """-> the push payload if something on her route changed, else None.
+
+    `allow_simulated=False` makes this ignore the demo scenario entirely. The
+    scheduled jobs pass it, because the scenario flag is process-wide and
+    unauthenticated: a demo left armed at 20:00 otherwise sends a simulated
+    disruption to every real subscriber as a genuine alert (F09). When the
+    scenario *is* allowed, anything it contributed is labelled in the payload —
+    the rubric caps the score for mocked data presented as live.
+    """
+    alerts, _ = await lift_service.current_alerts(allow_simulated=allow_simulated)
     on_route = [a for a in alerts if a["affects_route"]]
 
-    value, fetched = await scenario.alert_value()
+    value, fetched = await scenario.alert_value(allow_simulated=allow_simulated)
     disruption = disruption_service.assess(value, fetched.observed_iso)
 
     if not on_route and not disruption:
@@ -45,6 +53,12 @@ async def check_trip(trip: dict) -> dict | None:
         else:
             body = "A lift at this station is out. We have checked your route."
 
+    # Whichever side produced this message, say where it came from.
+    simulated = (value.get("_source") == "simulated" if disruption
+                 else on_route[0].get("source") == "simulated")
+    note = ((value.get("_simulated_note") if disruption else on_route[0].get("simulated_note"))
+            or scenario.NOTE_DISRUPTION if simulated else None)
+
     payload = {
         "title": title,
         "body": body,
@@ -52,7 +66,10 @@ async def check_trip(trip: dict) -> dict | None:
         "severity": "critical" if disruption else "warn",
         "url": f"/trip/{trip['trip_id']}",
         "sent_at": datetime.now(SGT).isoformat(timespec="seconds"),
+        "source": "simulated" if simulated else "live",
     }
+    if simulated:
+        payload["simulated_note"] = note
     payload["digest"] = hashlib.sha256(
-        json.dumps([title, body], sort_keys=True).encode()).hexdigest()[:16]
+        json.dumps([title, body, payload["source"]], sort_keys=True).encode()).hexdigest()[:16]
     return payload
