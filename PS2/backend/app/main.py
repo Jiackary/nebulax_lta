@@ -6,15 +6,19 @@ each endpoint serves and PS2_BACKEND_PLAN.md §9 for build status.
 """
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from . import data, jobs, store
 from .config import ATTRIBUTION, LTA_ACCOUNT_KEY, ONEMAP_TOKEN, USE_FIXTURES
+
+log = logging.getLogger("ps2.main")
 
 
 @asynccontextmanager
@@ -38,14 +42,20 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
-@app.exception_handler(HTTPException)
-async def _http_error(request: Request, exc: HTTPException):
-    """Serve the error shape the contract specifies, not FastAPI's `detail` wrapper."""
+@app.exception_handler(StarletteHTTPException)
+async def _http_error(request: Request, exc: StarletteHTTPException):
+    """Serve the error shape the contract specifies, not FastAPI's `detail` wrapper.
+
+    Registered for Starlette's HTTPException, not FastAPI's: routing raises the
+    Starlette one, so unknown routes and wrong methods used to escape this and
+    return a bare `{"detail": "Not Found"}` (F21).
+    """
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    code = {404: "NOT_FOUND", 405: "METHOD_NOT_ALLOWED"}.get(
+        exc.status_code, "INVALID_REQUEST")
     return JSONResponse(status_code=exc.status_code, content={
-        "error": {"code": "INVALID_REQUEST", "message": str(exc.detail),
-                  "retryable": False}})
+        "error": {"code": code, "message": str(exc.detail), "retryable": False}})
 
 
 @app.exception_handler(RequestValidationError)
@@ -99,3 +109,17 @@ def attribution():
         "weather": {"text": "Weather data from data.gov.sg",
                     "url": "https://data.gov.sg"},
     }
+
+
+@app.exception_handler(Exception)
+async def _unhandled_error(request: Request, exc: Exception):
+    """Anything that escapes a route still answers in the contract's shape (F21).
+
+    Without this, an uncaught exception returned a text/plain 500 that no client
+    parsing `error.code` could read.
+    """
+    log.exception("unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={
+        "error": {"code": "INTERNAL_ERROR",
+                  "message": "Something went wrong on our side.",
+                  "retryable": True}})

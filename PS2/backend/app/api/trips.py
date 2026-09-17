@@ -1,29 +1,51 @@
 """Trip planning endpoints (API contract §3, §6)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Literal
 
+import httpx
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, conlist, field_validator
 
 from .. import data, store
-from ..config import ATTRIBUTION, HOME_DEFAULT, SGT, SGH
+from ..config import ATTRIBUTION, HOME_DEFAULT, SGT, SGH, USE_FIXTURES
 from ..services import planner
 from ..sources import onemap
 
 router = APIRouter()
 
 
+# An appointment outside this window is a typo, not a plan (F15). Generous on
+# both sides: she may well book a year out.
+MAX_APPOINTMENT_DAYS = 400
+PACES = ("slow", "steady", "brisk")
+
+
 class Preferences(BaseModel):
-    walking_pace: str = "slow"
+    # "sprint" used to be accepted, stored, and silently planned as slow.
+    walking_pace: Literal[PACES] = "slow"
     avoid_stairs: bool = True
     prefer_sheltered: bool = True
-    buffer_min: int = planner.DEFAULT_BUFFER_MIN
+    # A negative buffer produced a leave-by *after* the appointment; 1e12
+    # overflowed into a 500.
+    buffer_min: int = Field(planner.DEFAULT_BUFFER_MIN, ge=0, le=120)
 
 
 class Origin(BaseModel):
-    label: str = HOME_DEFAULT["label"]
-    coord: list[float] = Field(default_factory=lambda: list(HOME_DEFAULT["coord"]))
+    label: str = Field(default=HOME_DEFAULT["label"], max_length=200)
+    # A bare list let [], [103.93] and [x, y, z] through to a TypeError and a
+    # plain-text 500.
+    coord: conlist(float, min_length=2, max_length=2) = Field(
+        default_factory=lambda: list(HOME_DEFAULT["coord"]))
+
+    @field_validator("coord")
+    @classmethod
+    def coord_is_on_earth(cls, value: list[float]) -> list[float]:
+        lon, lat = value
+        if not (-180 <= lon <= 180 and -90 <= lat <= 90):
+            raise ValueError("coord must be [longitude, latitude] in degrees")
+        return value
 
 
 class TripRequest(BaseModel):
@@ -36,8 +58,16 @@ class TripRequest(BaseModel):
     @classmethod
     def appointment_in_singapore_time(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
-            return value.replace(tzinfo=SGT)
-        return value.astimezone(SGT)
+            value = value.replace(tzinfo=SGT)
+        else:
+            value = value.astimezone(SGT)
+        now = datetime.now(SGT)
+        if value < now - timedelta(minutes=1):
+            raise ValueError("appointment_at is in the past")
+        if value > now + timedelta(days=MAX_APPOINTMENT_DAYS):
+            raise ValueError(
+                f"appointment_at is more than {MAX_APPOINTMENT_DAYS} days away")
+        return value
 
 
 def _err(code: str, message: str, status: int = 400, retryable: bool = False):
@@ -110,11 +140,21 @@ async def places_search(q: str):
     """
     if len(q.strip()) < 3:
         return {"results": []}
+    if USE_FIXTURES:
+        # PS2_USE_FIXTURES=1 means no network, and OneMap ignored it entirely (F16).
+        raise _err("UPSTREAM_UNAVAILABLE",
+                   "Address search needs the network; this server is running offline "
+                   "from recorded fixtures.", status=503, retryable=False)
     try:
         return {"results": await onemap.search(q), "source": "OneMap"}
     except onemap.OneMapAuthError as exc:
         raise _err("UPSTREAM_UNAVAILABLE",
                    f"Address search is unavailable: {exc}", status=503, retryable=True)
+    except (httpx.HTTPError, ValueError) as exc:
+        # A timeout, connection error, 5xx or non-JSON body used to be a 500.
+        raise _err("UPSTREAM_UNAVAILABLE",
+                   f"Address search is unavailable: {type(exc).__name__}",
+                   status=503, retryable=True)
 
 
 @router.get("/destinations")
