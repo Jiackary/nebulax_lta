@@ -28,3 +28,19 @@ from app.sources.base import Source  # noqa: E402
 def never_write_fixtures(monkeypatch):
     """No test may rewrite a committed fixture."""
     monkeypatch.setattr(Source, "_record", lambda self, value, observed: None)
+
+
+@pytest.fixture(autouse=True)
+def clean_database():
+    """One shared SQLite file, so each test starts from an empty one.
+
+    Without this a leftover subscription from an earlier test looks like one the
+    test under inspection created, which is exactly the kind of confusion the
+    delete-scope tests exist to catch.
+    """
+    from app import store
+    store.init()
+    with store.conn() as c:
+        for table in ("trips", "push_subs", "sent"):
+            c.execute(f"DELETE FROM {table}")
+    yield

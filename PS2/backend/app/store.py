@@ -136,16 +136,19 @@ def subscriptions() -> list[dict]:
              "trip_ids": json.loads(r["trip_ids"])} for r in rows]
 
 
-def delete_subscription(endpoint: str | None = None) -> dict:
-    """Unsubscribing deletes her stored trips too (§8 commitment 1)."""
+def delete_subscription(endpoint: str) -> dict:
+    """Unsubscribing deletes her stored trips too (§8 commitment 1).
+
+    One endpoint only. The `endpoint=None` branch used to delete every
+    subscription and every trip linked to them, which any HTTP client could
+    reach unauthenticated (F04).
+    """
+    if not endpoint:
+        raise ValueError("delete_subscription requires an endpoint")
     with conn() as c:
-        if endpoint:
-            subs = c.execute("SELECT trip_ids FROM push_subs WHERE endpoint=?",
-                             (endpoint,)).fetchall()
-            c.execute("DELETE FROM push_subs WHERE endpoint=?", (endpoint,))
-        else:
-            subs = c.execute("SELECT trip_ids FROM push_subs").fetchall()
-            c.execute("DELETE FROM push_subs")
+        subs = c.execute("SELECT trip_ids FROM push_subs WHERE endpoint=?",
+                         (endpoint,)).fetchall()
+        c.execute("DELETE FROM push_subs WHERE endpoint=?", (endpoint,))
         trip_ids = {t for r in subs for t in json.loads(r["trip_ids"])}
         for tid in trip_ids:
             c.execute("DELETE FROM trips WHERE trip_id=?", (tid,))

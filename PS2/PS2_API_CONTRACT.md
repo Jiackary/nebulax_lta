@@ -358,12 +358,33 @@ One request, cached by the service worker. Everything the underground leg needs 
 
 → `{ "subscribed": true, "checks": ["20:00 the evening before", "07:00 on the day"] }`
 
-`DELETE /api/push/subscribe` unregisters **and deletes stored trips** (§8 commitment 1).
+`subscription.endpoint` must be an `https` URL on a known push service
+(`fcm.googleapis.com`, `*.push.apple.com`, `*.notify.windows.com`,
+`updates.push.services.mozilla.com`). Anything else is `422`: the server POSTs to this
+URL, so an unrestricted one is an SSRF primitive.
 
-### `POST /api/push/test`
+### `DELETE /api/push/subscribe?endpoint=…`
+
+Unregisters **and deletes stored trips** (§8 commitment 1).
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `endpoint` | yes | The subscription to remove. Only this subscription and the trips linked to it are deleted. |
+
+`endpoint` is **required**. It was optional until F04, and omitting it deleted every
+subscription on the server together with all their trips.
+
+### `POST /api/push/test?trip_id=…`
 
 Fires a warning immediately through the real path so judges need not wait for 20:00 (D4).
 → `{ "sent": true, "note": "Test warning sent to this device." }`
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `trip_id` | yes | The trip to check and push for. |
+
+`trip_id` is **required**. It was optional until F05, and omitting it acted on the first
+trip in the database — pushing to another user's device and returning her trip id.
 
 ### Push payload
 

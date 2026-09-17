@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from . import store
-from .api.push import send_push
+from .api.push import send_push_async
 from .config import SGT
 from .services import notify
 
@@ -37,7 +37,8 @@ async def run_check(label: str, horizon_hours: int) -> dict:
         matching_subs = [sub for sub in subs if trip["trip_id"] in sub["trip_ids"]]
         all_delivered = bool(matching_subs)
         for sub in matching_subs:
-            ok, err = send_push({"endpoint": sub["endpoint"], "keys": sub["keys"]}, payload)
+            ok, err = await send_push_async(
+                {"endpoint": sub["endpoint"], "keys": sub["keys"]}, payload)
             if ok:
                 sent += 1
             else:
