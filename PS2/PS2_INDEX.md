@@ -28,6 +28,8 @@ All paths below are relative to `PS2/` unless prefixed with `../`.
 | S9 | `submission/README.md` (119 lines) | **How to package and hand in.** Repo layout, README requirements, credential rules, claims rules, pre-submission checklist. | Logistics (where/when to submit) are still `TBC` — see §8. |
 | S10 | `../README.md` | Repo-wide overview covering PS1/PS2/PS3 + DataMall quick start. | Contains three broken references — see §7.1. |
 | S11 | `PS2_DECISION_RECORD.md` *(ours)* | **Why we build for Mdm Lim.** The three pre-commitment checks, their live-API results, the end-to-end join validation, the limitations to carry into `WRITEUP.md`, the build decisions D1–D14 (§7) and a draft privacy statement (§8). | Written 17 Sep 2026. Read this before re-litigating the persona choice. |
+| S13 | `PS2_BACKEND_PLAN.md` *(ours)* | **How the backend gets built**, plus eight issues found in the decision record (I1–I8) — including that GTFS ride time is fixed, not a range. | Written 17 Sep 2026. Read §2 before acting on D7 or D8. |
+| S14 | `PS2_API_CONTRACT.md` *(ours)* | **Every field the backend serves the frontend**, with worked JSON. FastAPI's `/openapi.json` is the machine truth. | Frontend can start against this before the backend exists. |
 | S12 | `evidence/` *(ours)* | Timestamped captures backing claims in S11 — currently the `v2/FacilitiesMaintenance` snapshot. | Ship these: the brief requires captured data for any live-feed claim. |
 
 **Not in the repo but named as required reading:** the DataMall portal's static master lists
@@ -309,6 +311,9 @@ documented `Line` enum**.
 | T19 | **`GeospatialWholeIsland` layers ship in SVY21, not WGS84.** `TrainStationExit`'s bundled `.prj` is Singapore's national projected grid — reproject before overlaying on an OSM base. `pyproj` reads the `.prj` directly. | Verified 17 Sep 2026, see S11 §4 |
 | T20 | **`v2/FacilitiesMaintenance.LiftDesc` has no fixed format.** ALL CAPS and Title Case both occur, some rows carry a `(TEL)`-style line prefix, and internal lifts carry no exit reference at all. `LiftID` varies too (`B3L02`, `B1 L01` with a space, empty string). Parse defensively. | Observed live, see S11 §2 |
 | T21 | **`TrainStationExit` carries no station code** — only `stn_name` and `exit_code` — so joining it to `FacilitiesMaintenance` runs through the station *name*. Suffixes are clean (`MRT STATION` ×541, `LRT STATION` ×72). | Measured from the Jul2026 layer, see S11 §2 |
+| T22 | **`GTFSScheduleTrain` returns lowercase `link`, not the documented `Link`** — plus an undocumented `timestamp`. A parser written from guide v6.9 p.56 raises `KeyError`. | Verified live 17 Sep 2026; see `PS2_BACKEND_PLAN.md` I4 |
+| T23 | **GTFS `stops.txt` is the canonical station table the brief asks you to build** — 217 `stop_code` values with names and coordinates — and **`parent_station` unifies 28 interchanges across line codes** (`EW16 ← {EW16, NE3, TE17}`, `DT10 ← {DT10, TE11}`). Prefer it over name-matching `TrainStationExit`. | Measured from the live feed 17 Sep 2026; see `PS2_BACKEND_PLAN.md` I3 |
+| T24 | **GTFS train ride times are fixed, not ranges.** All 698 EW5→EW16 trips are 30.7 min exactly. Timing uncertainty must come from headway (2.5 min peak / 5.0 off-peak) and walking pace. | Measured 17 Sep 2026; see `PS2_BACKEND_PLAN.md` I1 |
 
 ---
 
@@ -403,3 +408,5 @@ python3 -m venv "$SP/venv"
 | Why we chose Mdm Lim, and the evidence | `PS2_DECISION_RECORD.md` |
 | What we decided to build, and what gets cut | `PS2_DECISION_RECORD.md` §7 |
 | What the privacy statement says | `PS2_DECISION_RECORD.md` §8 |
+| How the backend is built, and what's wrong with the record | `PS2_BACKEND_PLAN.md` |
+| What the API serves the frontend | `PS2_API_CONTRACT.md` |
