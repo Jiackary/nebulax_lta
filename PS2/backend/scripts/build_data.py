@@ -42,6 +42,9 @@ OVERPASS = "https://overpass-api.de/api/interpreter"
 UA = "PS2-SmartCommuterCompanion/0.1 (LTA NebulaX hackathon; contact via repo)"
 
 # Her corridor: the only two places she walks. Bboxes are (S, W, N, E).
+BEDOK_STATION = (1.32401132, 103.930173)
+SGH_COORD = (1.279643, 103.835541)
+
 CORRIDOR = {
     "bedok": (1.3180, 103.9230, 1.3350, 103.9430),
     "outram": (1.2740, 103.8300, 1.2870, 103.8450),
@@ -124,6 +127,39 @@ def fetch_geospatial(layer: str) -> None:
     out.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(zip_path) as z:
         z.extractall(out)
+
+
+def _paged(client: httpx.Client, endpoint: str) -> list[dict]:
+    """DataMall pages 500 at a time via $skip (guide p.9)."""
+    rows, skip = [], 0
+    while True:
+        r = client.get(f"{DATAMALL}/{endpoint}", params={"$skip": skip},
+                       headers={"AccountKey": account_key()})
+        if r.status_code == 404:
+            sys.exit(f"{endpoint}: 404 — check the AccountKey header is being sent (T18)")
+        r.raise_for_status()
+        batch = r.json().get("value", [])
+        rows.extend(batch)
+        if len(batch) < 500:
+            return rows
+        skip += 500
+
+
+def fetch_bus() -> None:
+    """BusRoutes + BusStops, for the accessible-bus alternative in D2.2."""
+    dest = CACHE / "bus_routes.json"
+    if dest.exists():
+        log("fetch: BusRoutes/BusStops — cached, skipping")
+        return
+    with httpx.Client(timeout=60) as c:
+        log("fetch: BusRoutes (paged)")
+        routes = _paged(c, "BusRoutes")
+        dest.write_text(json.dumps(routes))
+        log(f"  {len(routes):,} route rows")
+        log("fetch: BusStops (paged)")
+        stops = _paged(c, "BusStops")
+        (CACHE / "bus_stops.json").write_text(json.dumps(stops))
+        log(f"  {len(stops):,} stops")
 
 
 def fetch_overpass() -> None:
@@ -689,6 +725,72 @@ def build_osm_graph() -> tuple[dict, dict]:
     return graph, covered_gj
 
 
+def build_bus_options() -> dict:
+    """Bus services that serve both her end and the hospital end, in one ride.
+
+    D2.2 offers "a regular bus to SGH". Whether such a bus exists is a question
+    about the network, not an assumption — so it is answered here from
+    BusRoutes, and if the answer is none, the option is not offered.
+    """
+    rp, sp = CACHE / "bus_routes.json", CACHE / "bus_stops.json"
+    if not rp.exists():
+        log("  bus options skipped: run --fetch first")
+        return {}
+    routes = json.loads(rp.read_text())
+    stops = {s["BusStopCode"]: s for s in json.loads(sp.read_text())}
+
+    def near(lat: float, lon: float, radius: float) -> set[str]:
+        return {code for code, s in stops.items()
+                if _haversine(lat, lon, s["Latitude"], s["Longitude"]) <= radius}
+
+    home_stops = near(BEDOK_STATION[0], BEDOK_STATION[1], 500)
+    sgh_stops = near(SGH_COORD[0], SGH_COORD[1], 500)
+    log(f"  bus stops within 500 m: {len(home_stops)} near Bedok, {len(sgh_stops)} near SGH")
+
+    by_service: dict[tuple, list] = defaultdict(list)
+    for r in routes:
+        by_service[(r["ServiceNo"], r["Direction"])].append(r)
+
+    options = []
+    for (svc, direction), rows in by_service.items():
+        rows.sort(key=lambda r: r["StopSequence"])
+        board = next((r for r in rows if r["BusStopCode"] in home_stops), None)
+        if not board:
+            continue
+        alight = next((r for r in rows
+                       if r["BusStopCode"] in sgh_stops
+                       and r["StopSequence"] > board["StopSequence"]), None)
+        if not alight:
+            continue
+        options.append({
+            "service_no": svc, "direction": direction,
+            "board": {"code": board["BusStopCode"],
+                      "name": stops[board["BusStopCode"]]["Description"],
+                      "road": stops[board["BusStopCode"]]["RoadName"],
+                      "coord": [stops[board["BusStopCode"]]["Longitude"],
+                                stops[board["BusStopCode"]]["Latitude"]],
+                      "first_bus": board.get("WD_FirstBus"), "last_bus": board.get("WD_LastBus")},
+            "alight": {"code": alight["BusStopCode"],
+                       "name": stops[alight["BusStopCode"]]["Description"],
+                       "road": stops[alight["BusStopCode"]]["RoadName"],
+                       "coord": [stops[alight["BusStopCode"]]["Longitude"],
+                                 stops[alight["BusStopCode"]]["Latitude"]]},
+            "stops": alight["StopSequence"] - board["StopSequence"],
+            "distance_km": round(alight["Distance"] - board["Distance"], 1),
+        })
+    options.sort(key=lambda o: o["stops"])
+    if options:
+        for o in options[:5]:
+            log(f"    bus {o['service_no']} dir {o['direction']}: "
+                f"{o['board']['name']} -> {o['alight']['name']}, "
+                f"{o['stops']} stops, {o['distance_km']} km")
+    else:
+        log("    no single bus serves both ends — D2.2 cannot offer one")
+    log(f"  bus_options.json: {len(options)} direct services")
+    return {"direct": options,
+            "home_stop_count": len(home_stops), "sgh_stop_count": len(sgh_stops)}
+
+
 def write(name: str, payload) -> None:
     DERIVED.mkdir(parents=True, exist_ok=True)
     path = DERIVED / name
@@ -711,6 +813,7 @@ def main() -> None:
         fetch_gtfs()
         fetch_geospatial("TrainStationExit")
         fetch_geospatial("CoveredLinkWay")
+        fetch_bus()
         fetch_overpass()
 
     if args.build or args.all:
@@ -721,6 +824,7 @@ def main() -> None:
         ridetimes = build_ridetimes(stations)
         headways = build_headways(stations)
         graph, covered = build_osm_graph()
+        bus = build_bus_options()
         log("=== write ===")
         write("stations.json", stations)
         write("line_codes.json", lines)
@@ -729,6 +833,7 @@ def main() -> None:
         write("headways.json", headways)
         write("stepfree_graph.json", graph)
         write("covered_ways.geojson", covered)
+        write("bus_options.json", bus)
         log("done.")
 
 

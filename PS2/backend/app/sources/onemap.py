@@ -62,3 +62,27 @@ async def walk_route(start: tuple[float, float], end: tuple[float, float]) -> di
         raise OneMapAuthError("OneMap token rejected — it may have expired")
     r.raise_for_status()
     return r.json()
+
+
+async def pt_route(start: list[float], end: list[float], when) -> dict:
+    """Public-transport itineraries for a given departure.
+
+    Used only to time the bus alternative honestly — inventing a bus journey
+    time would be exactly the unverifiable number the rubric penalises.
+    """
+    if not ONEMAP_TOKEN:
+        raise OneMapAuthError("ONEMAP_TOKEN is not set")
+    params = {
+        "start": f"{start[1]},{start[0]}", "end": f"{end[1]},{end[0]}",
+        "routeType": "pt", "mode": "BUS",
+        "date": when.strftime("%m-%d-%Y"), "time": when.strftime("%H:%M:%S"),
+        # OneMap rejects numItineraries > 3 with a 400. Undocumented.
+        "maxWalkDistance": "800", "numItineraries": "3",
+    }
+    async with httpx.AsyncClient(timeout=30) as client:
+        r = await client.get(f"{ONEMAP}/public/routingsvc/route", params=params,
+                             headers={"Authorization": f"Bearer {ONEMAP_TOKEN}"})
+    if r.status_code == 401:
+        raise OneMapAuthError("OneMap token rejected — it may have expired")
+    r.raise_for_status()
+    return r.json()

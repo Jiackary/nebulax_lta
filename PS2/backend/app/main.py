@@ -54,10 +54,11 @@ async def _validation_error(request: Request, exc: RequestValidationError):
                   "retryable": False}})
 
 
-from .api import status, trips  # noqa: E402
+from .api import alternatives, status, trips  # noqa: E402
 
 app.include_router(trips.router, prefix="/api")
 app.include_router(status.router, prefix="/api")
+app.include_router(alternatives.router, prefix="/api")
 
 
 @app.get("/api/health")

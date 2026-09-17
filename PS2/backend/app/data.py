@@ -47,6 +47,11 @@ def headways() -> dict:
 
 
 @lru_cache(maxsize=1)
+def bus_options() -> dict:
+    return _load("bus_options.json")
+
+
+@lru_cache(maxsize=1)
 def graph_raw() -> dict:
     return _load("stepfree_graph.json")
 

@@ -93,6 +93,30 @@ this change and update §3.2, §6 limitation 2 and trap T21 with whatever it bec
 > large: it keys on `stop_code` (kills the name join, T21) and ships WGS84 (kills the SVY21
 > reprojection, T19).
 
+### I14 — D2.1's "leave later" has no answer when the delay exceeds her buffer · **extended**
+
+D2.1 offers *leave later* "when the delay parsed from `Message` fits within her buffer". The
+demo replay is Annex C's 20-minute delay and her buffer is 15 minutes, so the rule correctly
+declines — and D2's promised three options became two.
+
+For a trip she has **not yet started**, the useful advice is the mirror image: leave *earlier*.
+The service now emits `option_id: "leave_later"` when the delay fits and `"leave_earlier"` when
+it does not, keeping her on the step-free route either way. With the 20-minute replay she is told
+to *"Leave 5 minutes earlier"* — the delay less the slack already in the plan. This is an addition
+to `PS2_API_CONTRACT.md` §5, which lists only `leave_later`.
+
+### I15 — OneMap `numItineraries` is capped at 3, undocumented · **trap**
+
+`routingsvc/route?routeType=pt` returns **400 Bad Request** for `numItineraries` of 4 or more;
+1–3 return 200. Worse, the three it returns *vary between identical calls*, so a single-bus
+itinerary is not guaranteed to appear — an early version of the bus option silently vanished on
+some requests.
+
+The fix makes OneMap advisory rather than authoritative: the candidate services come from our own
+`bus_options.json`, and OneMap is consulted only to time them. If it times one, we show a measured
+journey time; if it times none, we still offer the bus and say the journey time is not stated
+rather than inventing one.
+
 ### I12 — The contract's example home coordinate is not that address · **fixed**
 
 `PS2_API_CONTRACT.md` §3 shows origin `"Blk 123 Bedok North St 2"` at `[103.9312, 1.3271]`,
@@ -353,7 +377,7 @@ needs to know in the Notes column.
 | 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `done` | Serves `POST/GET/DELETE /api/trips`, `/api/places/search`, `/api/health`, `/api/attribution`. Plan for a 10:30 appointment: **leave 09:19, arrive 10:03–10:14**, 696 m walking, step-free, 60% sheltered. Range narrows correctly at peak (44–52 min at 08:30 vs 44–55 off-peak) because the only live input is headway. **For later stages:** her home is now a real geocoded address (I12); ride time must come from `ridetimes._pairs`, not summed segments (I13); `services/lifts.py` is a stub that stage 4 replaces. |
 | 4 | **Lift matcher + reroute** | Capability 2 | `done` | Rules-based `LiftDesc` parser with three outcomes (`matched_exit` / `unmatched` / `station_only`). **Join re-measured: 2/4 stands** — 3 of 4 rows name an exit, 2 of those 3 resolve; decision record §3.2 and limitation 2 updated. Reroute verified: with Exit 6's lift out she is moved to Exit 7, +143 m, leaving 4 min earlier. Serves `GET /api/trips/{id}/status`. |
 | 5 | **Scenario layer** (§7) | Labelled injection for D1/D2 | `done` | `app/scenario.py` is the only module producing synthetic records. Verified every simulated object carries `source` + `simulated_note`, and that the 4 real outages stay `live` in the same array as the 1 simulated one. Toggle via `GET/POST /api/scenario`, default off. |
-| 6 | **Disruption alternatives** | Capability 3 | `not started` | Biggest single service. Three options per D2, shown against the original. |
+| 6 | **Disruption alternatives** | Capability 3 | `done` | `GET /api/trips/{id}/alternatives`. Three options against the original, each with a `why` and a signed `delta_min`. **Which** bus comes from `bus_options.json` — four real direct Bedok→SGH services derived from `BusRoutes`, two of which alight at SGH Block 3 — and **how long** it takes from OneMap PT, with live `WAB`/`Load`/`Monitored` from `v3/BusArrival`. See I14 (leave-earlier) and I15 (OneMap caps `numItineraries` at 3). |
 | 7 | **Push + scheduler** | Capability 6 — 20:00 / 07:00 checks | `not started` | Include `POST /api/push/test` so judges need not wait. |
 | 8 | **Offline bundle + crowd + weather** | Capabilities 4, 5, 7 | `not started` | Smallest and most cuttable. Offline tiles are parked (I6) — ship `tile_pack_url: null`. |
 | 9 | **Claim scripts** | `verify_stepfree.py` (D11), `score_rules.py` (D13) | `not started` | These produce the write-up's numbers. Must run **before** submission, not after. |
