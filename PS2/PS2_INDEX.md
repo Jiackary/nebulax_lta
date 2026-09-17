@@ -26,6 +26,8 @@ All paths below are relative to `PS2/` unless prefixed with `../`.
 | S8 | `references/4dayWeatherForecast.json` | OpenAPI 3.0.3 spec for `GET /four-day-outlook`. **Interface doc, not data.** | Schema in §4.4. |
 | S9 | `submission/README.md` (119 lines) | **How to package and hand in.** Repo layout, README requirements, credential rules, claims rules, pre-submission checklist. | Logistics (where/when to submit) are still `TBC` — see §8. |
 | S10 | `../README.md` | Repo-wide overview covering PS1/PS2/PS3 + DataMall quick start. | Contains three broken references — see §7.1. |
+| S11 | `PS2_DECISION_RECORD.md` *(ours)* | **Why we build for Mdm Lim.** The three pre-commitment checks, their live-API results, the end-to-end join validation, and the limitations to carry into `WRITEUP.md`. | Written 17 Sep 2026. Read this before re-litigating the persona choice. |
+| S12 | `evidence/` *(ours)* | Timestamped captures backing claims in S11 — currently the `v2/FacilitiesMaintenance` snapshot. | Ship these: the brief requires captured data for any live-feed claim. |
 
 **Not in the repo but named as required reading:** the DataMall portal's static master lists
 (§4.3), and the SG MRT Updates Telegram archive (§4.6).
@@ -285,7 +287,7 @@ documented `Line` enum**.
 
 | # | Trap | Source |
 |---|---|---|
-| T1 | **Line codes differ between endpoints.** Sengkang LRT `STL`/`SLRT`; Punggol LRT `PTL`/`PLRT`; Circle Line Extension folded into `CCL` in alerts but a separate `CEL` in crowd density; Changi Extension folded into `EWL` but a separate `CGL`. Build one canonical line table and map everything through it. | `PS2_README.md:L122–L134`; cross-checked S4 p.30 vs p.46 |
+| T1 | **Line codes differ between endpoints.** Sengkang LRT `STL`/`SLRT`; Punggol LRT `PTL`/`PLRT`; Circle Line Extension folded into `CCL` in alerts but a separate `CEL` in crowd density; Changi Extension folded into `EWL` but a separate `CGL`. **And a third Bukit Panjang spelling found live: `v2/FacilitiesMaintenance` returns `BPLRT`, not the documented `BPL`** — this case is in neither the brief's table nor the guide's. Build one canonical line table and map everything through it. | `PS2_README.md:L122–L134`; S4 p.30 vs p.46; `BPLRT` observed live 17 Sep 2026, see S11 §4 |
 | T2 | **`value` is an object, not an array,** on `TrainServiceAlerts` — unlike most DataMall endpoints. Parsers written generically will break. | S4 Annex C screenshots |
 | T3 | **`Status:1` does not mean "all clear".** On recovery the segment persists with `Stations:""` while free bus/shuttle stay active, and `Message` keeps flowing. Test emptiness of `AffectedSegments`, don't switch on `Status`. | S4 p.62, p.71 |
 | T4 | **`FreePublicBus` island-wide string is inconsistent.** Spec table says `Free bus service island wide`; every sample renders `Free bus service island-wide` (hyphen). Match loosely. | S4 p.31 vs p.69/71 |
@@ -302,6 +304,10 @@ documented `Line` enum**.
 | T15 | **Underground = no signal.** Decide explicitly what the app does between stations (cache / degrade / say it's stale) **and state the choice in the write-up** — it is a scored decision, not an edge case. | `PS2_README.md:L215` |
 | T16 | **Loop bus services carry direction suffixes** (`225G`/`225W`, `243G`/`243W`, `410G`/`410W`) and must be displayed individually. | S4 p.20 |
 | T17 | **Bus Arrival returns nothing at all — not even empty tags — outside operating hours or during maintenance.** Absence is not an error. | S4 p.14, p.18 |
+| T18 | **DataMall masks unauthorized as `404 "The requested API was not found"`**, not `401`. A missing or wrong `AccountKey` looks exactly like a wrong URL. Suspect the key first. | Observed 17 Sep 2026 across three endpoints, see S11 §4 |
+| T19 | **`GeospatialWholeIsland` layers ship in SVY21, not WGS84.** `TrainStationExit`'s bundled `.prj` is Singapore's national projected grid — reproject before overlaying on an OSM base. `pyproj` reads the `.prj` directly. | Verified 17 Sep 2026, see S11 §4 |
+| T20 | **`v2/FacilitiesMaintenance.LiftDesc` has no fixed format.** ALL CAPS and Title Case both occur, some rows carry a `(TEL)`-style line prefix, and internal lifts carry no exit reference at all. `LiftID` varies too (`B3L02`, `B1 L01` with a space, empty string). Parse defensively. | Observed live, see S11 §2 |
+| T21 | **`TrainStationExit` carries no station code** — only `stn_name` and `exit_code` — so joining it to `FacilitiesMaintenance` runs through the station *name*. Suffixes are clean (`MRT STATION` ×541, `LRT STATION` ×72). | Measured from the Jul2026 layer, see S11 §2 |
 
 ---
 
@@ -393,3 +399,4 @@ python3 -m venv "$SP/venv"
 | Things that will bite us | §6 above |
 | What's missing / inconsistent in the pack | §7 above |
 | What to ask the organisers | §8 above |
+| Why we chose Mdm Lim, and the evidence | `PS2_DECISION_RECORD.md` |
