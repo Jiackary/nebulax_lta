@@ -11,7 +11,7 @@ from ..config import HOME_DEFAULT, SGH
 from ..sources import weather
 
 
-def assess(nowcast: dict) -> dict:
+def assess(nowcast: dict, stale: bool = False) -> dict:
     home_area, home_km = weather.area_for(nowcast, HOME_DEFAULT["coord"][1],
                                           HOME_DEFAULT["coord"][0])
     sgh_area, sgh_km = weather.area_for(nowcast, SGH["coord"][1], SGH["coord"][0])
@@ -36,4 +36,5 @@ def assess(nowcast: dict) -> dict:
         "severity": "info" if rain else "ok",
         "affects_route": rain,
         "source": "live",
+        "stale": stale,
     }

@@ -106,13 +106,16 @@ async def build_status(trip: dict) -> dict:
         if a["source"] == "simulated":
             a["simulated_note"] = scenario.NOTE_LIFT
         a["observed_at"] = lifts_fetched.observed_iso
+        # A recorded fixture is a real response, but it is not current (F22).
+        a["stale"] = bool(lifts_fetched.stale) and a["source"] != "simulated"
 
     disruption = disruption_service.assess(alert_value, alerts_fetched.observed_iso)
 
     try:
         crowd_fetched = await datamall.crowd("EWL").get()
         crowd_rows = crowd_service.for_stations(crowd_fetched.data,
-                                                {ORIGIN_STATION, DEST_STATION})
+                                                {ORIGIN_STATION, DEST_STATION},
+                                                stale=bool(crowd_fetched.stale))
         for row in crowd_rows:
             row["observed_at"] = crowd_fetched.observed_iso
         crowd_stale = crowd_fetched.stale
@@ -121,7 +124,7 @@ async def build_status(trip: dict) -> dict:
 
     try:
         wx_fetched = await weather.nowcast.get()
-        wx = weather_policy.assess(wx_fetched.data)
+        wx = weather_policy.assess(wx_fetched.data, stale=bool(wx_fetched.stale))
         wx["observed_at"] = wx_fetched.observed_iso
         wx_stale = wx_fetched.stale
     except Exception:

@@ -18,7 +18,7 @@ LEVELS = {
 UNKNOWN = ("unknown", "No crowd reading", "info")
 
 
-def badge(row: dict) -> dict:
+def badge(row: dict, stale: bool = False) -> dict:
     level, label, severity = LEVELS.get((row.get("CrowdLevel") or "").lower(), UNKNOWN)
     station = data.station_by_code().get(row.get("Station", ""))
     return {
@@ -28,9 +28,13 @@ def badge(row: dict) -> dict:
         "label": label,
         "severity": severity,
         "window": [row.get("StartTime"), row.get("EndTime")],
+        # `source` stays live|simulated (contract §1). Whether the data is
+        # current is a separate flag, so a recorded fixture stops reading as
+        # live (contract rule 4, F22).
         "source": "live",
+        "stale": stale,
     }
 
 
-def for_stations(rows: list[dict], codes: set[str]) -> list[dict]:
-    return [badge(r) for r in rows if r.get("Station") in codes]
+def for_stations(rows: list[dict], codes: set[str], stale: bool = False) -> list[dict]:
+    return [badge(r, stale) for r in rows if r.get("Station") in codes]

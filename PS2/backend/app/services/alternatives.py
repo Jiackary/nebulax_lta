@@ -25,6 +25,14 @@ from ..config import DEST_STATION, ORIGIN_STATION, SGH, SGT
 from ..sources import datamall, onemap
 from .walking import haversine
 
+# Beyond this, a live bus arrival describes a bus she will not be on (F23).
+LIVE_ARRIVAL_WINDOW_MIN = 30
+
+
+class _NotNow(Exception):
+    """Live arrival data is not applicable to this departure."""
+
+
 LOAD_LABELS = {"SEA": ("Seats available", "ok"),
                "SDA": ("Standing available", "info"),
                "LSD": ("Limited standing", "warn")}
@@ -86,9 +94,22 @@ async def _bus_option(appointment: datetime, origin_coord: list[float]) -> dict 
 
     live = {"eta_min": None, "eta_is_scheduled": None, "load": None,
             "load_label": None, "wheelchair_accessible": None,
-            "not_running": False}
+            "not_running": False, "observed_at": None, "stale": None}
+    # A live arrival describes a bus leaving now. For a trip later today it says
+    # nothing useful, and "Not running now; first bus 0530" read at 01:03 for a
+    # 15:00 appointment is simply wrong (F23).
+    minutes_away = (appointment - datetime.now(SGT)).total_seconds() / 60
+    live_is_relevant = minutes_away <= LIVE_ARRIVAL_WINDOW_MIN
     try:
-        services = (await datamall.bus_arrival(board_code).get()).data
+        if not live_is_relevant:
+            raise _NotNow
+        fetched = await datamall.bus_arrival(board_code).get()
+        services = fetched.data
+        live["observed_at"] = fetched.observed_iso
+        # Recorded fixtures are real responses, but they are not current (F22).
+        live["stale"] = bool(fetched.stale)
+        if fetched.stale:
+            raise _NotNow
         row = next((s for s in services if s.get("ServiceNo") == service_no), None)
         if not services:
             # T17: nothing at all is returned outside operating hours. Absence is
@@ -104,6 +125,8 @@ async def _bus_option(appointment: datetime, origin_coord: list[float]) -> dict 
             live["wheelchair_accessible"] = nb.get("Feature") == "WAB"
         else:
             live["not_running"] = True
+    except _NotNow:
+        pass
     except Exception:
         pass
 
@@ -124,7 +147,11 @@ async def _bus_option(appointment: datetime, origin_coord: list[float]) -> dict 
         "label": f"Bus {service_no} from {chosen['board']['name']}",
         "why": why,
         "duration_min": duration_min,
-        "step_free": "yes",
+        # The bus is step-free only if this vehicle is wheelchair-accessible;
+        # unknown is not yes (F23).
+        "step_free": ("yes" if live["wheelchair_accessible"] is True
+                      else "no" if live["wheelchair_accessible"] is False
+                      else "unknown"),
         "severity": "info",
         "bus": {"service_no": service_no,
                 "board_stop": chosen["board"]["name"], "board_stop_code": board_code,
@@ -198,21 +225,43 @@ def _departure_option(plan: dict, delay_min: int | None, buffer_min: int) -> dic
             "legs": [],
         }
 
-    shortfall = delay_min - buffer_min
-    earlier = leave - timedelta(minutes=shortfall)
+    # Shift by the whole delay, not by the delay less the buffer: absorbing the
+    # buffer landed her within a minute of the appointment while the text said
+    # "still in time" (F24).
+    earlier = leave - timedelta(minutes=delay_min)
+    now = datetime.now(SGT)
+    if earlier < now:
+        # The advice has already expired; offering it is worse than saying so.
+        return {
+            "option_id": "leave_earlier", "mode": "rail",
+            "label": "Leaving earlier is no longer possible",
+            "why": (f"Setting off early enough to absorb the {delay_min}-minute delay "
+                    f"would have meant leaving at {earlier:%H:%M}, which has passed. "
+                    f"The other options below still stand."),
+            "delta_min": None,
+            "leave_by": None,
+            "leave_by_label": None,
+            "arrival_at": None,
+            "viable": False,
+            "step_free": "yes", "severity": "warn",
+            "timing_basis": (f"Your planned departure less the {delay_min} minutes LTA "
+                             f"has advised, compared with the time now."),
+            "legs": [],
+        }
     return {
         "option_id": "leave_earlier", "mode": "rail",
-        "label": f"Leave {shortfall} minutes earlier",
+        "label": f"Leave {delay_min} minutes earlier",
         "why": (f"The {delay_min}-minute delay is longer than the {buffer_min} minutes you "
                 f"keep spare, so setting off at {earlier:%H:%M} keeps you on your usual "
-                f"step-free route and still in time."),
+                f"step-free route and keeps your {buffer_min} minutes spare."),
         "delta_min": 0,
         "leave_by": earlier.isoformat(timespec="seconds"),
         "leave_by_label": f"Leave at {earlier:%H:%M} instead",
-        "arrival_at": (arrive_late + timedelta(minutes=delay_min - shortfall)).isoformat(timespec="seconds"),
+        "arrival_at": arrive_late.isoformat(timespec="seconds"),
+        "viable": True,
         "step_free": "yes", "severity": "info",
-        "timing_basis": (f"Your planned time, plus the {delay_min} minutes LTA has advised, "
-                         f"less the {buffer_min} minutes of slack already in the plan."),
+        "timing_basis": (f"Your planned time, shifted earlier by the full {delay_min} "
+                         f"minutes LTA has advised, so your buffer stays intact."),
         "legs": [],
     }
 
@@ -242,7 +291,11 @@ async def build(trip: dict, disruption: dict | None) -> dict:
     bus = await _bus_option(appointment, trip["origin"]["coord"])
     if bus:
         options.append(bus)
-    taxi = await _taxi_option(DEST_STATION)
+    # I7: "the station the current leg is heading to". Before departure that is
+    # her origin — she is still in Bedok, which is the main case for a
+    # pre-departure disruption (F25).
+    departed = datetime.now(SGT) >= datetime.fromisoformat(plan["summary"]["leave_by"])
+    taxi = await _taxi_option(DEST_STATION if departed else ORIGIN_STATION)
     if taxi:
         options.append(taxi)
 

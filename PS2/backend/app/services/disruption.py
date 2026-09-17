@@ -115,7 +115,7 @@ def _messages(value: dict) -> list[dict]:
             if not TEST_RE.match(m.get("Content", ""))]
 
 
-def assess(value: dict, observed_at: str) -> dict | None:
+def assess(value: dict, observed_at: str, stale: bool = False) -> dict | None:
     """Return the disruption block if one touches her journey, else None."""
     segments = _segments(value)
     if not segments:
@@ -125,10 +125,19 @@ def assess(value: dict, observed_at: str) -> dict | None:
     for s in segments:
         line = data.canonical_line(s.get("Line", "")) or (s.get("Line") or "").upper()
         stations = [x.strip().upper() for x in (s.get("Stations") or "").split(",") if x.strip()]
+        # A segment heading the other way is not her journey (F26). "Both" and
+        # an unstated direction both count.
+        direction = (s.get("Direction") or "").strip().casefold()
+        if direction and direction not in (HER_HEADSIGN, "both"):
+            continue
         if line == HER_LINE and set(stations) & set(HER_STATIONS):
             mine.append((s, line, stations))
     if not mine:
         return None
+
+    # T3 says to trust the segments, so an all-test message list does not drop
+    # a populated one — but it is not evidence for a delay figure either (F26).
+    all_test = bool(value.get("Message")) and not _messages(value)
 
     seg, line, stations = mine[0]
     delay, basis = None, None
@@ -154,9 +163,13 @@ def assess(value: dict, observed_at: str) -> dict | None:
         detail = (f"Delays reported between {data.station_by_code()[overlap[0]]['name']} "
                   f"and {data.station_by_code()[overlap[-1]]['name']}.")
 
+    if all_test:
+        delay, basis = None, None
+
     out = {
         "line": line,
-        "severity": "critical" if value.get("Status") == 2 else "warn",
+        "severity": ("warn" if all_test
+                     else "critical" if value.get("Status") == 2 else "warn"),
         "headline": headline,
         "detail": detail,
         "delay_min": delay,
@@ -168,7 +181,12 @@ def assess(value: dict, observed_at: str) -> dict | None:
         "free_bus_islandwide": island,
         "source": value.get("_source", "live"),
         "observed_at": observed_at,
+        "stale": stale,
     }
+    if all_test:
+        out["detail"] = (f"LTA reports a service change on the {line_name}, but every "
+                         f"message on the feed is a test broadcast, so we cannot give "
+                         f"a delay figure.")
     if out["source"] == "simulated":
         out["simulated_note"] = value.get("_simulated_note")
     return out
