@@ -162,3 +162,11 @@ def mark_sent(trip_id: str, check_at: str, digest: str) -> bool:
         c.execute("INSERT OR REPLACE INTO sent (trip_id, check_at, digest) VALUES (?,?,?)",
                   (trip_id, check_at, digest))
     return True
+
+
+def was_sent(trip_id: str, check_at: str, digest: str) -> bool:
+    """Whether this check already delivered an unchanged warning."""
+    with conn() as c:
+        row = c.execute("SELECT digest FROM sent WHERE trip_id=? AND check_at=?",
+                        (trip_id, check_at)).fetchone()
+    return bool(row and row["digest"] == digest)

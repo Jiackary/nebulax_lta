@@ -15,6 +15,7 @@ from . import timing, walking
 RAIL_ROUTE = "EWL"
 RAIL_DIRECTION = "1"          # westbound, headsign "Tuas Link"
 DEFAULT_BUFFER_MIN = 15
+MAX_ORIGIN_SNAP_M = 100
 
 
 def _station(code: str) -> dict:
@@ -42,7 +43,9 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
     blocked = blocked_exits or {}
     wg = data.walk_graph()
     origin_coord = origin["coord"]
-    area_from = wg.area_of(*origin_coord) or "bedok"
+    area_from = wg.area_of(*origin_coord)
+    if area_from != "bedok":
+        raise RuntimeError("origin is outside the supported Bedok walking area")
 
     first = walking.choose_entrance(origin_coord, area_from,
                                     blocked=blocked.get(ORIGIN_STATION),
@@ -54,6 +57,8 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
         raise RuntimeError("no step-free walking route to a usable entrance")
     board_exit, walk_in, board_ent = first
     alight_exit, walk_out, alight_ent = last
+    if walk_in.snap_m > MAX_ORIGIN_SNAP_M:
+        raise RuntimeError("origin is outside the supported Bedok walking area")
 
     ride = timing.ride_minutes(RAIL_ROUTE, ORIGIN_STATION, DEST_STATION)
     ride_min, ride_spread = ride if ride else (None, None)

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .. import data, store
 from ..config import ATTRIBUTION, HOME_DEFAULT, SGT, SGH
@@ -31,6 +31,13 @@ class TripRequest(BaseModel):
     destination_id: str = "SGH"
     appointment_at: datetime
     preferences: Preferences = Field(default_factory=Preferences)
+
+    @field_validator("appointment_at")
+    @classmethod
+    def appointment_in_singapore_time(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            return value.replace(tzinfo=SGT)
+        return value.astimezone(SGT)
 
 
 def _err(code: str, message: str, status: int = 400, retryable: bool = False):

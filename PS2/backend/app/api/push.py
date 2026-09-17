@@ -86,7 +86,8 @@ async def push_test(trip_id: str | None = None):
             "url": f"/trip/{trip['trip_id']}",
         }
 
-    subs = store.subscriptions()
+    subs = [sub for sub in store.subscriptions()
+            if trip["trip_id"] in sub["trip_ids"]]
     results = []
     for sub in subs:
         sent, error = send_push({"endpoint": sub["endpoint"], "keys": sub["keys"]}, payload)

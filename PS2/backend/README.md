@@ -32,6 +32,14 @@ was found.
 
 `.env` is gitignored and must stay that way — a committed credential caps the score.
 
+## Tests
+
+```bash
+cd PS2/backend
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+```
+
 ## Try the journey
 
 ```bash

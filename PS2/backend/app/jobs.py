@@ -31,15 +31,20 @@ async def run_check(label: str, horizon_hours: int) -> dict:
         payload = await notify.check_trip(trip)
         if not payload:
             continue
-        if not store.mark_sent(trip["trip_id"], label, payload["digest"]):
+        if store.was_sent(trip["trip_id"], label, payload["digest"]):
             skipped += 1
             continue
-        for sub in subs:
+        matching_subs = [sub for sub in subs if trip["trip_id"] in sub["trip_ids"]]
+        all_delivered = bool(matching_subs)
+        for sub in matching_subs:
             ok, err = send_push({"endpoint": sub["endpoint"], "keys": sub["keys"]}, payload)
             if ok:
                 sent += 1
             else:
+                all_delivered = False
                 log.warning("push failed: %s", err)
+        if all_delivered:
+            store.mark_sent(trip["trip_id"], label, payload["digest"])
     log.info("check %s: %d trips, %d sent, %d unchanged", label, len(trips), sent, skipped)
     return {"check": label, "trips": len(trips), "sent": sent, "unchanged": skipped}
 
