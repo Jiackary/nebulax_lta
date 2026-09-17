@@ -33,7 +33,12 @@ From D14's never-cut list, the backend owes the frontend seven things:
 
 Raised rather than worked around. Four are factual corrections; four are gaps to close.
 
-### I1 — D8 is wrong that GTFS gives "ride-time ranges" · **correction needed**
+**Status as of 17 Sep 2026:** I1 and I2 are **resolved** — D8 was amended in the decision record
+(commit `c5032ef`, see its §7.3). I3 is **partly applied**: D8 now names `parent_station` as the better key,
+but D7's matcher description is unchanged and the 2/4 join figure in §3.2 has not been
+re-measured. I6 is **parked** at the team's direction. I4, I5, I7 and I8 are open.
+
+### I1 — D8 is wrong that GTFS gives "ride-time ranges" · ~~correction needed~~ **RESOLVED**
 
 D8 says `GTFSScheduleTrain` "supplies frequency and ride-time ranges for the EWL leg, which is
 how timing uncertainty is made visible."
@@ -50,7 +55,7 @@ not ride time. The honest range is `ride 30.7 fixed + wait 0–headway + walk at
 This is still fully defensible and still satisfies `PS2_README.md:L248` — but D8's stated basis
 must change or the write-up will claim something the data does not support.
 
-### I2 — D8's condition is resolved: GTFS works · **decision can be firmed up**
+### I2 — D8's condition is resolved: GTFS works · ~~firm up~~ **RESOLVED**
 
 D8 is written conditionally ("if it returns usable data with our key") and time-boxed to an hour.
 `GET /GTFSScheduleTrain` returns `HTTP 200` and a 2.3 MB feed: **1,211 stops, 17,576 trips,
@@ -90,7 +95,7 @@ process. These are different things — D1 means no historical accumulation of o
 the bare phrase invites a judge's question. Suggest D1 read "No historical poller; the scheduled
 checks in D3 are unaffected."
 
-### I6 — D6's offline tiles depend on an unmade decision · **blocking, decide early**
+### I6 — D6's offline tiles depend on an unmade decision · **PARKED** by the team
 
 D6 caches map tiles for her route offline, "only as the tile provider's terms allow".
 `tile.openstreetmap.org` **prohibits bulk downloading and offline caching** outright

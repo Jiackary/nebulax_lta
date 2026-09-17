@@ -287,7 +287,10 @@ State all of these. The brief credits stated assumptions and known limits.
    station-level warnings, never to silent mis-routing.
 3. **Bedok has no elevators mapped in OSM.** We rely on entrance `wheelchair` tags plus the
    LTA lift feed at her origin.
-4. **Walking speed is assumed, not measured.** State the figure used.
+4. **Walking speed is assumed, not measured.** State the figure used. This matters more than
+   it looks: after the D8 correction, walking pace contributes **47–64% of the whole timing
+   range**, so the largest part of our stated uncertainty rests on an assumption rather than
+   on data.
 5. **OSM entrance `wheelchair` coverage is 60%**, so absence of the tag is not evidence of
    inaccessibility. Treat unknown as unknown, not as unusable.
 6. **The provided station GeoJSON is a 2017 planning snapshot** with no station codes and 13
@@ -360,12 +363,42 @@ OSM, `TrainStationExit` and a manual read of the operators' station pages. Outra
 three-line, two-operator interchange, the same shape as Stevens where matching failed, and the
 2/4 test in §3.2 never touched it. A row that cannot be matched becomes a station-level warning.
 
-**D8. GTFS train timetable, time-boxed to about an hour.** API guide v6.9 (S4b in
-`PS2_INDEX.md`) adds `GTFSScheduleTrain`. If it returns usable data with our key, it supplies
-frequency and ride-time ranges for the EWL leg, which is how timing uncertainty is made visible
-(`PS2_README.md:L248`). If not, we fall back to OneMap timing with published frequencies as the
-range. The two GTFS realtime feeds are not used: they only carry data during disruptions, and
-our disruption is a `TrainServiceAlerts` replay.
+**D8. GTFS train timetable. Committed, not conditional.** API guide v6.9 (S4b in
+`PS2_INDEX.md`) adds `GTFSScheduleTrain`. It was tested live on 17 Sep with our key: `HTTP 200`,
+a 2.3 MB feed with **1,211 stops, 17,576 trips and 333,262 stop_times**. The OneMap fallback is
+dropped — there is nothing left to fall back from.
+
+We keep it for two things:
+
+1. **The canonical station table.** `stops.txt` gives 217 `stop_code` values with names and
+   coordinates, and **`parent_station` unifies 28 interchanges across line codes** — Outram Park
+   is `EW16 ← {EW16, NE3, TE17}`, Stevens is `DT10 ← {DT10, TE11}`. This is the table
+   `PS2_README.md:L134` tells us to build, and it is the better key for the exit matcher in D7.
+2. **Headways, for the timing range.** Weekday westbound at Bedok: 2.5 min median between
+   08:00–09:00, 5.0 min between 13:00–14:00.
+
+> **Corrected by I1 (`PS2_BACKEND_PLAN.md` §2).** The original text said GTFS "supplies frequency
+> and **ride-time ranges** for the EWL leg, which is how timing uncertainty is made visible". The
+> ride-time half is false and a judge can disprove it from the same feed in two minutes: across
+> **all 698 EW5→EW16 trips the ride time is 30.7 minutes exactly** — minimum, median and maximum
+> identical. The East-West Line timetable carries no run-time variation at all. (Nor do NSL or
+> NEL. DTL has 2 distinct values and TEL has 11, so do not generalise this beyond her line.)
+>
+> **Timing uncertainty therefore comes from wait time and walking pace, not from ride time.** For
+> her trip the budget is: walk 4.5 min of spread, wait 0–5 min at her hour, ride 0.0. Total range
+> 7 min at peak, 9.5 off-peak. The requirement in `PS2_README.md:L248` is still met — only its
+> basis changes. `WRITEUP.md` must describe it this way, and the wording in
+> `PS2_API_CONTRACT.md` (`summary.timing_basis`) is already correct.
+>
+> Note also that GTFS is a **schedule, not a stopwatch**. Real trains vary; LTA's timetable does
+> not record it, and no feed exposes it to us (see the realtime note below). Say "scheduled 31
+> minutes", not "31 minutes".
+
+**The two GTFS realtime feeds are not used.** Verified on 17 Sep:
+`GTFSRealtimeTrainTripUpdates` returned **15 bytes — a header and no entities** on a normal day,
+confirming it only populates during a disruption. `GTFSRealTimeTrainServiceAlerts` did carry one
+entity, but it duplicates what `TrainServiceAlerts` already gives us in JSON rather than protobuf.
+Our disruption is a `TrainServiceAlerts` replay either way.
 
 **D9. Rain changes her walking route; crowding is shown but changes nothing.** When the 2-hour
 nowcast forecasts rain for her home or SGH area, walking legs keep to `CoveredLinkWay` even when
@@ -417,7 +450,9 @@ text is formulaic, rules run offline and instantly, and judges can check them wi
 
 1. Barrier-free taxi option (D2.3)
 2. Live bus checks, keeping a plain OneMap bus route (D2.2)
-3. GTFS timetable, falling back to OneMap timing plus published frequencies (D8)
+3. GTFS **headways** for the timing range, falling back to published frequencies (D8).
+   Note this cuts only the headway use. `stops.txt` stays regardless — it is the canonical
+   station table the exit matcher keys on (D7, D8.1), and removing it breaks the matcher.
 
 ---
 
