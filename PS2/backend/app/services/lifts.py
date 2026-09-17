@@ -151,12 +151,44 @@ async def current_alerts() -> tuple[list[dict], object]:
     return annotate_for_route(match_all(rows)), fetched
 
 
-def blocked_exits_sync() -> tuple[dict, dict]:
-    """Planner entry point. Never lets an upstream problem block a plan."""
+async def blocked_exits_now() -> tuple[dict, dict]:
+    """Async entry point — use this from anything already inside a loop."""
     try:
-        alerts, _ = asyncio.run(current_alerts())
-    except RuntimeError:                      # already inside a loop
-        return {}, {}
+        alerts, _ = await current_alerts()
     except Exception:                         # upstream down: plan without it
         return {}, {}
     return blocked_exits(alerts)
+
+
+def blocked_exits_sync() -> tuple[dict, dict]:
+    """Planner entry point for sync callers. Never blocks a plan on an upstream.
+
+    Inside a running loop this cannot start another, so it returns empty rather
+    than leaving a coroutine un-awaited; async callers must use
+    `blocked_exits_now()` instead.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop is not None:
+        return {}, {}
+    try:
+        return blocked_exits(asyncio.run(current_alerts())[0])
+    except Exception:
+        return {}, {}
+
+
+def plan_uses_blocked_exit(plan: dict, blocked: dict[str, set[str]]) -> bool:
+    """Is the stored plan sending her to a door whose lift is now out?"""
+    if not blocked:
+        return False
+    for leg in plan.get("legs", []):
+        for end in ("from", "to"):
+            node = leg.get(end) or {}
+            code, exit_code = node.get("station_code"), node.get("exit_code")
+            if not code or not exit_code:
+                continue
+            if exit_code.replace("Exit ", "") in blocked.get(code, set()):
+                return True
+    return False

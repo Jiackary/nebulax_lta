@@ -1,0 +1,33 @@
+{
+  "purpose": "Held examples for scoring the delay-minute parser (D13).",
+  "provenance": [
+    "Annex C rows: transcribed from the LTA DataMall API User Guide v6.8 Annex C screenshots (S4 p.58-73), via PS2_INDEX.md §5.4",
+    "Live row: TrainServiceAlerts captured 17 Sep 2026, in backend/data/fixtures/train_service_alerts.json",
+    "No Telegram notices are included. PS2_README.md:L207 says to ask before building on that archive programmatically, and we have not asked."
+  ],
+  "examples": [
+    {"id": 1, "source": "annex_c_p60",
+     "content": "1657hrs : NEL - Additional travelling time of 20 minutes between Boon Keng and Dhoby Ghaut towards HarbourFront.",
+     "expect_delay_min": 20, "expect_is_test": false},
+    {"id": 2, "source": "annex_c_p63",
+     "content": "1714hrs : NEL - Train service resumes. Free bus rides available at designated bus stops.",
+     "expect_delay_min": null, "expect_is_test": false,
+     "note": "Recovery message, no delay figure."},
+    {"id": 3, "source": "annex_c_p73",
+     "content": "Test : 1457hrs: SWL - Additional travelling time of 15 minutes on Seng Kang West LRT (West Loop).",
+     "expect_delay_min": 15, "expect_is_test": true,
+     "note": "A test broadcast naming SWL, a line code in no documented enum (T5). The figure parses, but the message must be excluded."},
+    {"id": 4, "source": "live_20260917",
+     "content": "05:00-SK-Planned Service Adjustment. From 19 Apr to 18 Oct 2026, the Sengkang West LRT Inner Loop (i.e. direction of STC Sengkang towards SW1 Cheng Lim) will be closed. Commuters can continue to use the Sengkang West LRT Outer Loop (i.e. direction of STC Sengkang towards SW8 Renjong), peak-hours shuttle bus services, or regular bus services.",
+     "expect_delay_min": null, "expect_is_test": false,
+     "note": "A planned-works notice, the kind that flows on a normal day. Contains dates and line codes but no delay figure."},
+    {"id": 5, "source": "annex_c_variant",
+     "content": "0812hrs : EWL - Additional travelling time of about 15 min between Bedok and Outram Park towards Tuas Link.",
+     "expect_delay_min": 15, "expect_is_test": false,
+     "note": "Abbreviated 'min' and a hedging 'about'."},
+    {"id": 6, "source": "annex_c_p70",
+     "content": "1820hrs : NSL - Additional travelling time of 30 minutes towards Jurong East. EWL - Additional travelling time of 10 minutes towards Pasir Ris.",
+     "expect_delay_min": 30, "expect_is_test": false,
+     "note": "One Content bundling two lines (T6). The parser takes the first figure; the segment list, not the text, decides which line is hers."}
+  ]
+}

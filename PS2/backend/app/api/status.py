@@ -33,9 +33,33 @@ def _next_check(now: datetime) -> datetime:
     return today_0700 + timedelta(days=1)
 
 
+async def refresh_plan(trip: dict, alerts: list[dict]) -> bool:
+    """Re-plan if a lift outage now blocks a door the stored plan uses (D7).
+
+    Without this the plan quietly goes stale: status would report the outage
+    while the steps still told her to use the lift that is out.
+    """
+    blocked, access = lift_service.blocked_exits(alerts)
+    if not lift_service.plan_uses_blocked_exit(trip["plan"], blocked):
+        return False
+    from ..services import planner
+    prefs = trip.get("preferences") or {}
+    appointment = datetime.fromisoformat(trip["plan"]["appointment_at"])
+    trip["plan"] = planner.plan_trip(
+        trip["origin"], appointment,
+        pace=prefs.get("walking_pace", "slow"),
+        buffer_min=prefs.get("buffer_min", planner.DEFAULT_BUFFER_MIN),
+        prefer_sheltered=prefs.get("prefer_sheltered", False),
+        blocked_exits=blocked, access=access)
+    trip["plan"]["rerouted"] = True
+    store.update_plan(trip["trip_id"], trip["plan"])
+    return True
+
+
 async def build_status(trip: dict) -> dict:
     now = datetime.now(SGT)
     alerts, lifts_fetched = await lift_service.current_alerts()
+    rerouted = await refresh_plan(trip, alerts)
     alert_value, alerts_fetched = await scenario.alert_value()
 
     for a in alerts:
@@ -63,7 +87,7 @@ async def build_status(trip: dict) -> dict:
     except Exception:
         wx, wx_stale = None, True
 
-    overall = _overall(alerts, disruption, wx)
+    overall = _overall(alerts, disruption, wx, rerouted)
     return {
         "trip_id": trip["trip_id"],
         "overall": overall,
@@ -76,12 +100,14 @@ async def build_status(trip: dict) -> dict:
             "next_check_at": _next_check(now).isoformat(timespec="seconds"),
             "label": f"Checked {now:%H:%M}. We'll check again at {_next_check(now):%H:%M}.",
         },
+        "rerouted": rerouted,
         "stale": bool(lifts_fetched.stale or alerts_fetched.stale or crowd_stale or wx_stale),
         "observed_at": lifts_fetched.observed_iso,
     }
 
 
-def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None) -> dict:
+def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None,
+             rerouted: bool = False) -> dict:
     """The one line that must be readable in a second (API contract §4)."""
     if disruption:
         return {
@@ -97,7 +123,8 @@ def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None) -> di
         return {
             "severity": "warn",
             "headline": f"A lift is out at {a['station_name']}.",
-            "detail": a["detail"] + " We have planned your walk around it.",
+            "detail": a["detail"] + (" We have moved you to another exit."
+                                     if rerouted else " Your route does not use it."),
             "action": {"kind": "view_reroute", "label": "See the new route"},
         }
     if wx and wx["rain_expected"]:
