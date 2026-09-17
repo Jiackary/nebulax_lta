@@ -37,54 +37,124 @@ PASS, FAIL = "PASS", "FAIL"
 
 
 def check_no_steps(plan: dict) -> tuple[str, list[str]]:
+    """Every walk leg, edge by edge. A pair we cannot resolve to a graph edge is
+    a FAIL, not a skip: an unresolved pair is an unchecked pair, and silently
+    dropping it is what let a real staircase pass by nudging a coordinate 1 cm.
+    """
     notes, verdict = [], PASS
     wg = data.walk_graph()
+    index = {tuple(v): k for k, v in wg.nodes.items()}
+    legs_seen = 0
     for leg in plan["legs"]:
         if leg["mode"] != "walk":
             continue
+        legs_seen += 1
         coords = leg["geometry"]["coordinates"]
-        index = {tuple(v): k for k, v in wg.nodes.items()}
-        used_steps = 0
-        for a, b in zip(coords, coords[1:]):
+        used_steps = unresolved = 0
+        pairs = list(zip(coords, coords[1:]))
+        for a, b in pairs:
             u, v = index.get(tuple(a)), index.get(tuple(b))
-            if u is None or v is None:
+            edge = wg.all_ways.get_edge_data(u, v) if (u is not None and v is not None) else None
+            if edge is None:
+                unresolved += 1
                 continue
-            edge = wg.all_ways.get_edge_data(u, v) or {}
             if edge.get("steps"):
                 used_steps += 1
-        notes.append(f"    {leg['leg_id']}: {leg['distance_m']} m, {used_steps} staircase edges")
-        if used_steps:
+        notes.append(f"    {leg['leg_id']}: {leg['distance_m']} m, "
+                     f"{len(pairs) - unresolved}/{len(pairs)} edges resolved, "
+                     f"{used_steps} staircase edges"
+                     + (f", {unresolved} UNRESOLVED" if unresolved else ""))
+        if used_steps or unresolved:
             verdict = FAIL
+    if not legs_seen:
+        notes.append("    no walking legs to check — nothing was verified")
+        verdict = FAIL
     return verdict, notes
 
 
+# A mapped elevator this close to the door is taken as serving it. Outram Exit 6
+# has one at 43 m; Bedok's nearest mapped lift is 779 m, so there the
+# `wheelchair=yes` tag is what carries the claim.
+LIFT_NEAR_M = 75
+
+
 async def check_entrances(plan: dict) -> tuple[str, list[str]]:
-    """Every door she is sent through: wheelchair=yes, or a lift that is in service."""
+    """Every door she is sent through: wheelchair=yes, or a lift near it that no
+    outage touches.
+
+    An outage that names no exit (`station_only`) or names one this station does
+    not have (`unmatched`) is treated as covering the whole station. We cannot
+    tell which door it belongs to, so an untagged door at that station is no
+    longer something this script is willing to call step-free.
+    """
     alerts, _ = await lift_service.current_alerts()
-    out_of_service = {(a["station_id"], (a["exit_code"] or "").replace("Exit ", ""))
-                      for a in alerts if a["resolution"] == "matched_exit"}
+    out_of_service = {(a["station_id"], e) for a in alerts
+                      if a["resolution"] == "matched_exit"
+                      for e in a.get("blocked_exit_refs") or
+                      [(a["exit_code"] or "").replace("Exit ", "")]}
+    station_level = {a["station_id"] for a in alerts
+                     if a["resolution"] in ("station_only", "unmatched")}
     wg = data.walk_graph()
-    notes, verdict = [], PASS
+    notes, verdict, checked, skipped = [], PASS, 0, 0
     for leg in plan["legs"]:
         for end in ("from", "to"):
             node = leg.get(end) or {}
             code, exit_code = node.get("station_code"), node.get("exit_code")
             if not code or not exit_code:
+                if node.get("station_code") or node.get("exit_code"):
+                    skipped += 1        # half-identified door: cannot check it
                 continue
             ref = exit_code.replace("Exit ", "")
             station = data.station_by_code().get(code)
-            area = wg.area_of(*station["coord"]) if station else None
+            if not station:
+                notes.append(f"    {code} {exit_code}: unknown station code -> FAIL")
+                verdict, skipped = FAIL, skipped + 1
+                continue
+            checked += 1
+            area = wg.area_of(*station["coord"])
             osm = wg.entrances_for(area).get(ref, {}) if area else {}
             tag = osm.get("wheelchair")
             lift_out = (station["station_id"], ref) in out_of_service
-            ok = (tag == "yes" or not lift_out)
-            reason = (f"OSM wheelchair={tag or 'untagged'}"
-                      + (", lift reported OUT" if lift_out else ", no lift outage reported"))
-            notes.append(f"    {station['name']} {exit_code}: {reason} -> "
+            station_out = station["station_id"] in station_level
+            lift_m = _nearest_lift_m(wg, osm, area)
+            lift_near = lift_m is not None and lift_m <= LIFT_NEAR_M
+
+            if lift_out:
+                ok, why = False, "its lift is reported OUT"
+            elif tag == "no":
+                ok, why = False, "OSM wheelchair=no"
+            elif tag == "yes":
+                ok, why = True, "OSM wheelchair=yes"
+            elif station_out:
+                ok, why = False, (f"OSM wheelchair={tag or 'untagged'} and a station-level "
+                                  f"outage is reported here")
+            elif lift_near:
+                ok, why = True, (f"OSM wheelchair={tag or 'untagged'}, mapped lift "
+                                 f"{lift_m:.0f} m away, no outage reported")
+            else:
+                ok, why = False, (f"OSM wheelchair={tag or 'untagged'} and no mapped lift "
+                                  f"within {LIFT_NEAR_M} m — accessibility unknown")
+            notes.append(f"    {station['name']} {exit_code}: {why} -> "
                          f"{'ok' if ok else 'FAIL'}")
             if not ok:
                 verdict = FAIL
+    notes.append(f"    checked {checked} entrance(s)"
+                 + (f", {skipped} could not be identified" if skipped else ""))
+    if checked == 0:
+        notes.append("    no entrance was checked — this claim verified nothing")
+        verdict = FAIL
+    if skipped:
+        verdict = FAIL
     return verdict, notes
+
+
+def _nearest_lift_m(wg, osm: dict, area: str | None) -> float | None:
+    if not osm.get("coord") or not area:
+        return None
+    lon, lat = osm["coord"]
+    ds = [walking.haversine(lat, lon, lift["coord"][1], lift["coord"][0])
+          for lift in wg.elevators if lift["area"] == area]
+    return min(ds) if ds else None
 
 
 async def baseline(plan: dict) -> list[str]:
