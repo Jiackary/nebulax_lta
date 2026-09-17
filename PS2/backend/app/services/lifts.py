@@ -27,14 +27,28 @@ import re
 from .. import data
 from ..config import DEST_STATION, ORIGIN_STATION
 
-# "Exit A", "EXIT A", "Exit 12", "Exits A/B". A leading "(TEL)" is a line prefix,
-# not part of the exit, so it is stripped before matching.
-EXIT_RE = re.compile(r"\bEXITS?\s+([A-Z0-9]{1,2})(?:\s*/\s*([A-Z0-9]{1,2}))?\b", re.I)
+# "Exit A", "EXIT A", "Exit 12", "Exits A/B", "Exits 6 & 7", "Exits 6, 7",
+# "Exit6" (no space) and "EXIT NO. 6". A leading "(TEL)" is a line prefix, not
+# part of the exit, so it is stripped before matching.
+#
+# The trailing (?![A-Z0-9]) stops a code being taken out of the middle of a word
+# — without it "Exit lobby" would parse as exit "LO".
+EXIT_SEP = r"(?:\s*(?:/|,|&|\+|\bAND\b)\s*)"
+EXIT_RE = re.compile(
+    r"\bEXITS?\.?\s*(?:NOS?\.?\s*)?"
+    r"([A-Z0-9]{1,2}(?:" + EXIT_SEP + r"[A-Z0-9]{1,2})*)(?![A-Z0-9])",
+    re.I)
+SPLIT_RE = re.compile(EXIT_SEP, re.I)
 LINE_PREFIX_RE = re.compile(r"^\s*\(([A-Z]{2,5})\)\s*")
 
 
 def parse_exits(lift_desc: str) -> tuple[list[str], str | None]:
-    """-> (exit codes found, the line prefix if the text carried one)."""
+    """-> (every exit code named, the line prefix if the text carried one).
+
+    Every code, not the first: a lift serving "Exits 5/6" takes both doors out,
+    and keeping only the first is a false negative — the dangerous direction
+    (F02).
+    """
     text = (lift_desc or "").strip()
     prefix = None
     m = LINE_PREFIX_RE.match(text)
@@ -43,9 +57,10 @@ def parse_exits(lift_desc: str) -> tuple[list[str], str | None]:
         text = text[m.end():]
     found: list[str] = []
     for hit in EXIT_RE.finditer(text):
-        for g in hit.groups():
-            if g and g.upper() not in found:
-                found.append(g.upper())
+        for part in SPLIT_RE.split(hit.group(1)):
+            code = part.strip().upper()
+            if code and code not in found:
+                found.append(code)
     return found, prefix
 
 
@@ -68,17 +83,23 @@ def match_row(row: dict) -> dict:
     station_id = station["station_id"] if station else None
     known = {e["exit_code"] for e in data.exits_by_station().get(station_id, [])}
 
+    # Every exit this station actually has, not just the first (F02).
+    matched = [e for e in exits if e in known]
     if not exits:
         resolution, exit_code = "station_only", None
-    elif set(exits) & known:
+    elif matched:
         resolution = "matched_exit"
-        exit_code = next(e for e in exits if e in known)
+        exit_code = matched[0]
     else:
         resolution, exit_code = "unmatched", None
 
     label = "Lift out of service"
     if resolution == "matched_exit":
-        detail = f"Exit {exit_code}'s lift is under maintenance."
+        if len(matched) == 1:
+            detail = f"Exit {matched[0]}'s lift is under maintenance."
+        else:
+            names = ", ".join(matched[:-1]) + f" and {matched[-1]}"
+            detail = f"The lift serving Exits {names} is under maintenance."
     elif resolution == "unmatched":
         detail = (f"A lift at {station['name'] if station else station_code} is under "
                   f"maintenance. We could not tell which exit it serves.")
@@ -92,6 +113,10 @@ def match_row(row: dict) -> dict:
         "station_id": station_id,
         "line": data.canonical_line(row.get("Line", "")) or row.get("Line"),
         "exit_code": f"Exit {exit_code}" if exit_code else None,
+        # Every door this outage takes out. `exit_code` stays the first, for the
+        # contract's single-exit field; anything deciding where she may walk
+        # must read this list instead (F02).
+        "blocked_exit_refs": matched,
         "lift_id": (row.get("LiftID") or "").strip() or None,
         "lift_desc": desc,
         "resolution": resolution,
@@ -137,10 +162,11 @@ def blocked_exits(alerts: list[dict]) -> tuple[dict[str, set[str]], dict]:
     for a in alerts:
         if a["resolution"] != "matched_exit" or not a["affects_route"]:
             continue
+        refs = a.get("blocked_exit_refs") or [a["exit_code"].replace("Exit ", "")]
         for code in (ORIGIN_STATION, DEST_STATION):
             st = station_for(code)
             if st and st["station_id"] == a["station_id"]:
-                blocked.setdefault(code, set()).add(a["exit_code"].replace("Exit ", ""))
+                blocked.setdefault(code, set()).update(refs)
     return blocked, {}
 
 

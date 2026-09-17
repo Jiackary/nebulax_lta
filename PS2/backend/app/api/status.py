@@ -1,6 +1,7 @@
 """Live overlay for a trip (API contract §4) and the scenario toggle (§8)."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
@@ -33,27 +34,51 @@ def _next_check(now: datetime) -> datetime:
     return today_0700 + timedelta(days=1)
 
 
-async def refresh_plan(trip: dict, alerts: list[dict]) -> bool:
-    """Re-plan if a lift outage now blocks a door the stored plan uses (D7).
+def _blocked_signature(blocked: dict[str, set[str]]) -> str:
+    return json.dumps({k: sorted(v) for k, v in sorted(blocked.items())})
 
-    Without this the plan quietly goes stale: status would report the outage
-    while the steps still told her to use the lift that is out.
+
+def route_key(plan: dict) -> list:
+    """The parts of a plan a reroute actually changes — the doors and the clock."""
+    doors = [(leg.get(end) or {}).get("exit_code")
+             for leg in plan.get("legs", []) for end in ("from", "to")]
+    return [doors, plan.get("summary", {}).get("leave_by")]
+
+
+async def refresh_plan(trip: dict, alerts: list[dict]) -> bool:
+    """Derive the effective plan for the outages known right now (D7, F07).
+
+    The stored `plan_original` is never overwritten, and the effective plan is
+    re-derived from it rather than from the last rerouted one. That is what makes
+    a reroute reversible: when the outage clears, the next call plans with no
+    blocked exits and lands back on the original.
+
+    Returns whether the effective plan differs from the original — "we moved
+    you" is a statement about the route she is being given, not about whether
+    *this* call happened to re-plan.
     """
     blocked, access = lift_service.blocked_exits(alerts)
-    if not lift_service.plan_uses_blocked_exit(trip["plan"], blocked):
-        return False
+    signature = _blocked_signature(blocked)
+    if trip["plan"].get("blocked_signature") == signature:
+        return bool(trip["plan"].get("rerouted"))
+
+    original = trip.get("plan_original") or trip["plan"]
     from ..services import planner
     prefs = trip.get("preferences") or {}
-    appointment = datetime.fromisoformat(trip["plan"]["appointment_at"])
-    trip["plan"] = planner.plan_trip(
+    appointment = datetime.fromisoformat(original["appointment_at"])
+    plan = planner.plan_trip(
         trip["origin"], appointment,
         pace=prefs.get("walking_pace", "slow"),
         buffer_min=prefs.get("buffer_min", planner.DEFAULT_BUFFER_MIN),
         prefer_sheltered=prefs.get("prefer_sheltered", False),
         blocked_exits=blocked, access=access)
-    trip["plan"]["rerouted"] = True
-    store.update_plan(trip["trip_id"], trip["plan"])
-    return True
+
+    rerouted = route_key(plan) != route_key(original)
+    plan["rerouted"] = rerouted
+    plan["blocked_signature"] = signature
+    trip["plan"] = plan
+    store.update_plan(trip["trip_id"], plan)
+    return rerouted
 
 
 async def build_status(trip: dict) -> dict:
@@ -87,7 +112,7 @@ async def build_status(trip: dict) -> dict:
     except Exception:
         wx, wx_stale = None, True
 
-    overall = _overall(alerts, disruption, wx, rerouted)
+    overall = _overall(alerts, disruption, wx, rerouted, trip["plan"])
     return {
         "trip_id": trip["trip_id"],
         "overall": overall,
@@ -107,8 +132,16 @@ async def build_status(trip: dict) -> dict:
 
 
 def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None,
-             rerouted: bool = False) -> dict:
-    """The one line that must be readable in a second (API contract §4)."""
+             rerouted: bool = False, plan: dict | None = None) -> dict:
+    """The one line that must be readable in a second (API contract §4).
+
+    "Your route does not use it" is a safety claim, so it is only made where it
+    can be checked: a `matched_exit` outage whose doors the plan provably avoids
+    (F01). An outage that names no exit (`station_only`) or names one this
+    station does not have (`unmatched`) cannot be placed on or off her path —
+    Outram Park is a three-line interchange, so a concourse lift there may well
+    be on her step-free route. Those say so and ask her to check.
+    """
     if disruption:
         return {
             "severity": disruption["severity"],
@@ -118,14 +151,49 @@ def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None,
         }
     on_route = [a for a in alerts if a["affects_route"]]
     if on_route:
-        a = on_route[0]
-        where = a["exit_code"] or "a lift"
+        matched = [a for a in on_route if a["resolution"] == "matched_exit"]
+        uncertain = [a for a in on_route if a["resolution"] in ("station_only", "unmatched")]
+        a = (matched or on_route)[0]
+        headline = f"A lift is out at {a['station_name']}."
+
+        still_used = []
+        if plan:
+            for alert in matched:
+                one, _ = lift_service.blocked_exits([alert])
+                if lift_service.plan_uses_blocked_exit(plan, one):
+                    still_used.append(alert)
+
+        if still_used:
+            # We know the door is out and could not move her off it. Never soften.
+            return {
+                "severity": "critical",
+                "headline": headline,
+                "detail": (still_used[0]["detail"] + " Your route still uses it and we "
+                           "could not find another step-free way in. Please check before "
+                           "you go."),
+                "action": {"kind": "view_alternatives", "label": "See your options"},
+            }
+        if rerouted:
+            detail = a["detail"] + " We have moved you to another exit."
+            if uncertain:
+                detail += (" Another lift there is also out and we cannot tell which exit "
+                           "it serves.")
+            return {"severity": "warn", "headline": headline, "detail": detail,
+                    "action": {"kind": "view_reroute", "label": "See the new route"}}
+        if uncertain:
+            u = uncertain[0]
+            return {
+                "severity": "warn",
+                "headline": headline,
+                "detail": (u["detail"] + " We cannot tell which exit it serves, so it may "
+                           "affect your route. Please check before you go."),
+                "action": {"kind": "view_trip", "label": "See your trip"},
+            }
         return {
             "severity": "warn",
-            "headline": f"A lift is out at {a['station_name']}.",
-            "detail": a["detail"] + (" We have moved you to another exit."
-                                     if rerouted else " Your route does not use it."),
-            "action": {"kind": "view_reroute", "label": "See the new route"},
+            "headline": headline,
+            "detail": a["detail"] + " Your route does not use it.",
+            "action": {"kind": "view_trip", "label": "See your trip"},
         }
     if wx and wx["rain_expected"]:
         return {"severity": "info", "headline": "Rain is forecast.",

@@ -22,7 +22,11 @@ CREATE TABLE IF NOT EXISTS trips (
     appointment_at  TEXT NOT NULL,
     origin          TEXT NOT NULL,
     preferences     TEXT NOT NULL,
-    plan            TEXT NOT NULL
+    plan            TEXT NOT NULL,
+    -- The plan as first built, never overwritten. `plan` is the effective plan
+    -- for the outages known at the last /status call; keeping the original is
+    -- what lets a reroute be undone when the outage clears (F07).
+    plan_original   TEXT
 );
 CREATE TABLE IF NOT EXISTS push_subs (
     endpoint    TEXT PRIMARY KEY,
@@ -54,21 +58,29 @@ def conn():
 def init() -> None:
     with conn() as c:
         c.executescript(SCHEMA)
+        # A database created before F07 has no plan_original.
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(trips)")}
+        if "plan_original" not in cols:
+            c.execute("ALTER TABLE trips ADD COLUMN plan_original TEXT")
+            c.execute("UPDATE trips SET plan_original = plan WHERE plan_original IS NULL")
 
 
 def new_trip_id() -> str:
     return "t_" + secrets.token_urlsafe(4).replace("-", "").replace("_", "")[:4]
 
 
-def save_trip(appointment_at: datetime, origin: dict, preferences: dict, plan: dict) -> str:
+def save_trip(appointment_at: datetime, origin: dict, preferences: dict, plan: dict,
+              plan_original: dict | None = None) -> str:
     trip_id = new_trip_id()
+    plan_original = plan_original if plan_original is not None else plan
     with conn() as c:
         c.execute(
-            "INSERT INTO trips (trip_id, created_at, appointment_at, origin, preferences, plan)"
-            " VALUES (?,?,?,?,?,?)",
+            "INSERT INTO trips (trip_id, created_at, appointment_at, origin, preferences,"
+            " plan, plan_original) VALUES (?,?,?,?,?,?,?)",
             (trip_id, datetime.now(SGT).isoformat(timespec="seconds"),
              appointment_at.astimezone(SGT).isoformat(timespec="seconds"),
-             json.dumps(origin), json.dumps(preferences), json.dumps(plan)))
+             json.dumps(origin), json.dumps(preferences),
+             json.dumps(plan), json.dumps(plan_original)))
     return trip_id
 
 
@@ -82,7 +94,8 @@ def get_trip(trip_id: str) -> dict | None:
             "appointment_at": row["appointment_at"],
             "origin": json.loads(row["origin"]),
             "preferences": json.loads(row["preferences"]),
-            "plan": json.loads(row["plan"])}
+            "plan": json.loads(row["plan"]),
+            "plan_original": json.loads(row["plan_original"] or row["plan"])}
 
 
 def update_plan(trip_id: str, plan: dict) -> None:

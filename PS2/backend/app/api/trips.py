@@ -46,17 +46,28 @@ def _err(code: str, message: str, status: int = 400, retryable: bool = False):
                                            "retryable": retryable}})
 
 
-def build_plan(origin: dict, appointment: datetime, prefs: dict) -> dict:
-    """Plan, then let the live overlay revise the exits if a lift is out (D7)."""
+def build_plan(origin: dict, appointment: datetime, prefs: dict) -> tuple[dict, dict]:
+    """Plan, then let the live overlay revise the exits if a lift is out (D7).
+
+    Returns `(effective, baseline)`. The baseline is the clear-day route, planned
+    with nothing blocked, and it is what gets stored as `plan_original`: if an
+    outage that was live at creation were baked into the original, clearing it
+    would read as a reroute in the wrong direction (F07).
+    """
     from ..services import lifts as lift_service
     blocked, access = lift_service.blocked_exits_sync()
-    plan = planner.plan_trip(
-        origin, appointment,
-        pace=prefs.get("walking_pace", "slow"),
-        buffer_min=prefs.get("buffer_min", planner.DEFAULT_BUFFER_MIN),
-        prefer_sheltered=prefs.get("prefer_sheltered", False),
-        blocked_exits=blocked, access=access)
-    return plan
+
+    def _plan(blocked_exits, access_info):
+        return planner.plan_trip(
+            origin, appointment,
+            pace=prefs.get("walking_pace", "slow"),
+            buffer_min=prefs.get("buffer_min", planner.DEFAULT_BUFFER_MIN),
+            prefer_sheltered=prefs.get("prefer_sheltered", False),
+            blocked_exits=blocked_exits, access=access_info)
+
+    effective = _plan(blocked, access)
+    baseline = _plan({}, None) if blocked else effective
+    return effective, baseline
 
 
 @router.post("/trips")
@@ -67,10 +78,10 @@ def create_trip(req: TripRequest):
     origin = req.origin.model_dump()
     prefs = req.preferences.model_dump()
     try:
-        plan = build_plan(origin, req.appointment_at, prefs)
+        plan, baseline = build_plan(origin, req.appointment_at, prefs)
     except RuntimeError as exc:
         raise _err("INVALID_REQUEST", str(exc))
-    trip_id = store.save_trip(req.appointment_at, origin, prefs, plan)
+    trip_id = store.save_trip(req.appointment_at, origin, prefs, plan, baseline)
     return {"trip_id": trip_id, **plan}
 
 

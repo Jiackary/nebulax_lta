@@ -18,7 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.services.disruption import TEST_RE, parse_delay      # noqa: E402
-from app.services.lifts import match_row, parse_exits         # noqa: E402
+from app.services.lifts import (annotate_for_route, blocked_exits,   # noqa: E402
+                                match_row, parse_exits)
 
 HAND = Path(__file__).resolve().parent.parent / "data" / "handchecked"
 
@@ -27,20 +28,38 @@ def score_lift_desc() -> tuple[int, int, list[str]]:
     blob = json.loads((HAND / "lift_desc_examples.json").read_text())
     failures, passed = [], 0
     print("LiftDesc exit parser")
-    print(f"{'':3} {'station':8} {'parsed':10} {'resolution':13} {'expected':13} result")
+    print(f"{'':3} {'station':8} {'parsed':10} {'resolution':13} {'expected':13} "
+          f"{'blocked':12} result")
     for ex in blob["examples"]:
         exits, _prefix = parse_exits(ex["lift_desc"])
         row = match_row({"StationCode": ex["station_code"], "LiftDesc": ex["lift_desc"],
                          "LiftID": ex["lift_id"], "Line": ""})
         ok = (exits == ex["expect_exits"]
               and row["resolution"] == ex["expect_resolution"])
+
+        # The route outcome, not just the parse. Scoring only `parsed_exits` and
+        # `resolution` is why #7 passed while the planner still walked her into
+        # the second blocked door (F02).
+        blocked = ""
+        if "expect_blocked" in ex:
+            got, _ = blocked_exits(annotate_for_route([dict(row)]))
+            got = {k: sorted(v) for k, v in got.items()}
+            want = {k: sorted(v) for k, v in ex["expect_blocked"].items()}
+            blocked = ",".join(f"{k}:{'/'.join(v)}" for k, v in sorted(got.items())) or "-"
+            if got != want:
+                ok = False
+                failures.append(f"#{ex['id']} {ex['lift_desc'][:40]}: "
+                                f"blocked {got}, want {want}")
         passed += ok
-        if not ok:
+        if not ok and exits == ex["expect_exits"] \
+                and row["resolution"] == ex["expect_resolution"]:
+            pass                      # already recorded as a blocked-exit failure
+        elif not ok:
             failures.append(f"#{ex['id']} {ex['lift_desc'][:52]}: "
                             f"got {exits}/{row['resolution']}, "
                             f"want {ex['expect_exits']}/{ex['expect_resolution']}")
         print(f"{ex['id']:>3} {ex['station_code']:8} {str(exits):10} {row['resolution']:13} "
-              f"{ex['expect_resolution']:13} {'ok' if ok else 'FAIL'}")
+              f"{ex['expect_resolution']:13} {blocked:12} {'ok' if ok else 'FAIL'}")
     return passed, len(blob["examples"]), failures
 
 
