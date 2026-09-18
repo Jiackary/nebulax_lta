@@ -12,7 +12,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from .config import DERIVED
+from .config import DERIVED, HANDCHECKED
 
 
 def _load(name: str):
@@ -50,6 +50,21 @@ def headways() -> dict:
 @lru_cache(maxsize=1)
 def bus_options() -> dict:
     return _load("bus_options.json")
+
+
+@lru_cache(maxsize=1)
+def public_holidays() -> frozenset[str]:
+    """ISO dates that run the `sunday_ph` timetable (F27).
+
+    Hand-entered rather than derived — `build_data.py` reads the GTFS
+    `service_id` prefix and never `calendar_dates.txt`, so no committed artefact
+    knows the dates. Absent file means an empty set, which is the old behaviour:
+    every weekday uses the weekday table.
+    """
+    path = HANDCHECKED / "public_holidays.json"
+    if not path.exists():
+        return frozenset()
+    return frozenset(h["date"] for h in json.loads(path.read_text())["holidays"])
 
 
 @lru_cache(maxsize=1)
@@ -119,12 +134,30 @@ class WalkGraph:
         return None
 
     def candidates(self, area: str, step_free: bool) -> list[int]:
-        """Only nodes in the area's main component — the rest are stubs (I11)."""
+        """Only nodes in the area's main component — the rest are stubs (I11).
+
+        `self.component` was computed at build time on the graph *with* stairs,
+        so for step-free snapping it is the wrong partition: drop the staircases
+        and Bedok's one main component falls into 105 pieces (12,077 nodes, then
+        235, 77, …). Snapping to the nearest node of any piece then strands an
+        origin on a 47-node island and answers "no step-free walking route" for
+        a coordinate 42 m from the network she can actually use (F17). So for
+        `step_free` the components are recomputed here, on the step-free graph,
+        and only the largest is offered.
+
+        Dropping the small pieces rather than routing within them is the safe
+        direction: a route confined to an island would be a walk that cannot
+        reach any entrance. An origin too far from the main piece still fails
+        `MAX_ORIGIN_SNAP_M` in the planner and is told so honestly.
+        """
         key = (area, step_free)
         if key not in self._by_area:
             G = self.step_free if step_free else self.all_ways
             want = self.main_by_area[area]
-            self._by_area[key] = [n for n in G.nodes if self.component.get(n) == want]
+            nodes = [n for n in G.nodes if self.component.get(n) == want]
+            if step_free and nodes:
+                nodes = sorted(max(nx.connected_components(G.subgraph(nodes)), key=len))
+            self._by_area[key] = nodes
         return self._by_area[key]
 
     def station_of_entrance(self, ent: dict) -> str | None:

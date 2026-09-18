@@ -446,7 +446,7 @@ Written during the backend build (stages 1–9). Each entry says why, with the i
 | Field | Change | Why |
 |---|---|---|
 | `POST /api/trips` → `origin` | Example origin is now **Blk 208B New Upper Changi Road** `[103.930570, 1.324782]` | The old example's coordinate was not the address it named. Geocoded properly, "Blk 123 Bedok North St 2" is 1,364 m from the station — a 32-minute walk at her pace (**I12**). |
-| `summary.timing_basis` | Wording is generated, and always says *scheduled* | GTFS is a timetable, not a stopwatch (D8). Example: `"Train ride is a scheduled 31 min, fixed by the timetable. A train every 2.5 min at this hour, so 0–2.5 min of waiting. 707 m of walking at an assumed 0.7 m/s."` |
+| `summary.timing_basis` | Wording is generated, and always says *scheduled* | GTFS is a timetable, not a stopwatch (D8). Example: `"Train ride is a scheduled 31 min, fixed by the timetable. A train every 2.5 min when she boards, so 0–2.5 min of waiting. 707 m of walking at an assumed 0.7 m/s."` |
 | `options[].option_id` | Adds **`leave_earlier`** alongside `leave_later` | D2.1's rule only covered a delay that fits her buffer. The Annex C replay is 20 min against a 15 min buffer, so that option vanished. For a trip not yet begun, the useful advice is to leave earlier (**I14**). |
 | `alternatives.options[].duration_min` | May be `null` | We only state a bus journey time when OneMap can time that service for that departure. Otherwise the bus is still offered and the time is left unstated rather than invented (**I15**). |
 | `tiles.tile_pack_url` | `null`, and now carries `tiles.unavailable_reason` | I6 is parked. The reason is returned so the UI can explain it rather than showing an empty map. |
@@ -513,15 +513,20 @@ finding IDs are those of the review on PR #1.
 | `error.code` | Adds `NOT_FOUND`, `METHOD_NOT_ALLOWED` and `INTERNAL_ERROR`. Unknown routes, wrong methods and uncaught exceptions now use the §1 envelope instead of `{"detail": ...}` or text/plain. | F21 |
 | `422` responses | `coord` must be a 2-element pair in degrees; `buffer_min` `0–120`; `walking_pace` one of `slow \| normal` (the keys of `timing.PACE`, so §3's stated pair is correct and enforced); the appointment must be in the future and within 400 days. | F15 |
 | `subscription.endpoint` | Must be `https` on a known push service, else `422`. `results[].error` is a code (`PUSH_FAILED`, `ENDPOINT_NOT_ALLOWED`, `ENDPOINT_GONE`), never the upstream's response body. | F03 |
+| `legs[].headway_min`, `summary.timing_basis` | Read at the hour she **boards**, not the hour of the appointment — about an hour apart on this trip, and 2.5 min against 5.0 across the 08h boundary. The sentence now says *"a train every 5 min when she boards"* rather than *"at this hour"*. A public holiday reads the `sunday_ph` table whatever weekday it falls on. | F27 |
+| `POST /api/trips` → `400 INVALID_REQUEST` | **Added reason.** An appointment whose boarding hour has no service is refused (*"no East-West Line service from Bedok around 00:27 — the line is not running then"*) instead of planned against the nearest hour that does run. A 01:30 appointment used to return "leave 00:20". | F27 |
+| Step-free walk routing | Origins are snapped to the largest component of the **step-free** graph, not of the graph with stairs. 29 of 625 sampled Bedok origins were refused with *"no step-free walking route"* while within 100 m of usable network; they now route. One genuinely 105 m out is refused as *outside the supported area* instead. | F17 |
 
 ### Still not reconciled
 
 - **§3's worked example is stale.** The origin was updated but the summary still shows
   `leave_by` 09:24, `duration_min` 46, `range_min` [41, 51] and `sheltered_pct` 78. Measured
-  on 2026-09-18 for a 10:30 appointment at the API default (`prefer_sheltered=true`):
-  **09:19, 50, [45, 56], 60**, arriving 10:03–10:14. The `timing_basis` string and the
-  `access` block in §3.1 (`lift_id`, `status: "in_service"`) are illustrative and do not
-  match what is served — see the two tables above.
+  on 2026-09-18 for a Monday 10:30 appointment at the API default (`prefer_sheltered=true`),
+  after the F27 fix: **09:22, 49, [45, 53], 60**, arriving 10:06–10:14. (Before F27 the same
+  call gave 09:19, 50, [45, 56] — it priced the wait at the 10h headway of 5.0 min when she
+  boards at 09:32, where it is 2.5.) The `access` block in §3.1 (`lift_id`,
+  `status: "in_service"`) is illustrative and does not match what is served — see the two
+  tables above.
 - **§8's scenario shapes are wrong.** The GET/POST response shape is shown nested under
   `scenarios`, and the POST body is never documented; posting the nested shape returns 200
   and changes nothing. Only the flat body works. `{"enabled": false}` also cannot switch the

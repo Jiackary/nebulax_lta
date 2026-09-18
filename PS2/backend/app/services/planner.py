@@ -6,7 +6,7 @@ and saying honestly how long it takes.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .. import data
 from ..config import ATTRIBUTION, DEST_STATION, ORIGIN_STATION, SGH, SGT
@@ -75,15 +75,39 @@ def plan_trip(origin: dict, appointment_at: datetime, *, pace: str = "slow",
 
     ride = timing.ride_minutes(RAIL_ROUTE, ORIGIN_STATION, DEST_STATION)
     ride_min, ride_spread = ride if ride else (None, None)
-    headway = timing.headway_min(RAIL_ROUTE, ORIGIN_STATION, RAIL_DIRECTION, appointment_at)
 
     walk_in_r = timing.walk_range(walk_in.distance_m, pace)
     walk_out_r = timing.walk_range(walk_out.distance_m, pace)
-    wait_r = timing.wait_range(headway)
     ride_r = timing.Range(ride_min or 0, ride_min or 0, ride_min or 0)
-    total = walk_in_r + wait_r + ride_r + walk_out_r
 
-    clock = timing.leave_by(appointment_at, total, buffer_min)
+    def schedule(headway: float | None):
+        """Everything downstream of the headway, plus when she reaches the platform."""
+        wait_r = timing.wait_range(headway)
+        total = walk_in_r + wait_r + ride_r + walk_out_r
+        clock = timing.leave_by(appointment_at, total, buffer_min)
+        # She walks in before she waits, and `leave_by` plans against the slow
+        # end, so the slow walk is the hour to ask about.
+        board_at = clock["leave_by"] + timedelta(minutes=walk_in_r.slow)
+        return wait_r, total, clock, board_at
+
+    # The headway that governs her wait is the one at the hour she reaches the
+    # platform, not the hour of her appointment — an hour apart on this trip, and
+    # 2.5 min against 5.0 across the 08h boundary (F27). Locate the boarding time
+    # with a first pass, then price the wait at that hour. One pass is enough:
+    # the shift is minutes, and the second lookup is what the plan is built from.
+    _, _, _, board_at = schedule(
+        timing.headway_min(RAIL_ROUTE, ORIGIN_STATION, RAIL_DIRECTION, appointment_at))
+    headway = timing.headway_min(RAIL_ROUTE, ORIGIN_STATION, RAIL_DIRECTION, board_at)
+    wait_r, total, clock, board_at = schedule(headway)
+
+    # Refusing beats inventing a train. The old nearest-hour fallback planned a
+    # 01:30 appointment as "leave 00:20" on a line that had stopped running.
+    if timing.has_service(RAIL_ROUTE, ORIGIN_STATION, RAIL_DIRECTION, board_at) is False:
+        raise RuntimeError(
+            f"no {data.line_codes()['lines'][RAIL_ROUTE]['name']} service from "
+            f"{_station(ORIGIN_STATION)['name']} around "
+            f"{board_at.astimezone(SGT):%H:%M} — the line is not running then")
+
     total_walk_m = walk_in.distance_m + walk_out.distance_m
     total_cov_m = walk_in.covered_m + walk_out.covered_m
 
