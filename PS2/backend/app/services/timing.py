@@ -1,0 +1,109 @@
+"""Timing and its uncertainty (I1, D8, PS2_README.md:L248).
+
+The correction that matters: GTFS train ride time is a single fixed value on her
+line — 30.67 min across all 698 EW5→EW16 trips, zero spread. So the visible
+uncertainty cannot come from the ride. It comes from two places we can defend:
+
+  * **wait** — 0 to one headway, from the measured timetable (2.5 min at 08h
+    weekday, 5.0 off-peak at Bedok).
+  * **walking pace** — a band around her assumed pace. This is an assumption,
+    not a measurement, and §6 limitation 4 requires us to say so.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from ..config import SGT
+from .. import data
+
+# metres per second: (nominal, slow end, fast end)
+PACE = {
+    "slow": (0.7, 0.6, 0.85),
+    "normal": (1.2, 1.0, 1.4),
+}
+DAYTYPE_OF_WEEKDAY = {0: "weekday", 1: "weekday", 2: "weekday", 3: "weekday",
+                      4: "weekday", 5: "saturday", 6: "sunday_ph"}
+
+
+@dataclass
+class Range:
+    """Minutes: what it takes if everything goes well, and if it does not."""
+    fast: float
+    nominal: float
+    slow: float
+
+    def __add__(self, other: "Range") -> "Range":
+        return Range(self.fast + other.fast, self.nominal + other.nominal,
+                     self.slow + other.slow)
+
+
+def walk_range(distance_m: float, pace: str) -> Range:
+    nominal, slow, fast = PACE.get(pace, PACE["slow"])
+    return Range(distance_m / fast / 60, distance_m / nominal / 60, distance_m / slow / 60)
+
+
+def headway_min(route: str, stop_code: str, direction: str, when: datetime) -> float | None:
+    table = data.headways().get(route, {}).get(stop_code, {})
+    daytype = DAYTYPE_OF_WEEKDAY[when.weekday()]
+    hours = table.get(daytype, {}).get(direction, {})
+    if not hours:
+        return None
+    hour = str(when.hour)
+    if hour in hours:
+        return hours[hour]
+    # nearest hour we have, rather than inventing one
+    known = sorted(int(h) for h in hours)
+    nearest = min(known, key=lambda h: abs(h - when.hour))
+    return hours[str(nearest)]
+
+
+def wait_range(headway: float | None) -> Range:
+    """She does not time her arrival to the platform, so the wait is uniform
+    across the headway. Nominal is half."""
+    if not headway:
+        return Range(0.0, 2.5, 5.0)
+    return Range(0.0, headway / 2, headway)
+
+
+def ride_minutes(route: str, origin: str, dest: str) -> tuple[float, float] | None:
+    """(median, spread) for a station pair, measured end to end including dwell."""
+    pairs = data.ridetimes().get("_pairs", {}).get(route, {})
+    row = pairs.get(f"{origin}>{dest}")
+    if not row:
+        return None
+    return row["median"], round(row["max"] - row["min"], 2)
+
+
+def leave_by(appointment: datetime, total: Range, buffer_min: int) -> dict:
+    """Plan against the slow end, so following the advice still arrives in time.
+
+    `leave_by` is the one big number on her screen (API contract §3); the window
+    stays visible underneath because a bare point estimate risks the level-3 cap
+    on route planning.
+    """
+    depart = appointment - timedelta(minutes=buffer_min + total.slow)
+    depart = depart.replace(second=0, microsecond=0)
+    arrive_early = depart + timedelta(minutes=total.fast)
+    arrive_late = depart + timedelta(minutes=total.slow)
+    return {
+        "leave_by": depart.astimezone(SGT),
+        "arrive_early": arrive_early.astimezone(SGT),
+        "arrive_late": arrive_late.astimezone(SGT),
+    }
+
+
+def basis_sentence(ride: float | None, spread: float | None, headway: float | None,
+                   pace: str, walk_m: float) -> str:
+    nominal = PACE.get(pace, PACE["slow"])[0]
+    bits = []
+    if ride is not None:
+        # "Scheduled", never "takes": GTFS is a timetable, not a stopwatch (D8).
+        if spread == 0:
+            bits.append(f"Train ride is a scheduled {ride:.0f} min, fixed by the timetable")
+        else:
+            bits.append(f"Train ride is a scheduled {ride:.0f} min")
+    if headway:
+        bits.append(f"a train every {headway:g} min at this hour, so 0–{headway:g} min of waiting")
+    bits.append(f"{walk_m:.0f} m of walking at an assumed {nominal} m/s")
+    return ". ".join(b[0].upper() + b[1:] for b in bits) + "."

@@ -9,6 +9,10 @@ frontend work can start before the backend exists.
 **Machine truth.** FastAPI serves `/openapi.json` and `/docs`. Where this document and the
 generated schema disagree, the schema wins and this file is the bug.
 
+**Status: the backend is built and serving all of this** (`PS2_BACKEND_PLAN.md` §9, stages 1–9
+`done`). §10 below lists every way the built API differs from this document as first written —
+read it before wiring a screen.
+
 **Base URL** `/api` · JSON throughout · times ISO 8601 with `+08:00` · coordinates WGS84
 `[lon, lat]` (GeoJSON order).
 
@@ -51,6 +55,9 @@ by someone who walks slowly, and because the rubric caps specific failures.
 `message` is shown to the user as-is. Codes: `TRIP_NOT_FOUND`, `UPSTREAM_UNAVAILABLE`,
 `INVALID_REQUEST`, `PUSH_SUBSCRIPTION_INVALID`.
 
+This is the shape on the wire. FastAPI would normally wrap errors in `detail`; exception
+handlers unwrap it, so `error` is always top-level — including for validation failures.
+
 ---
 
 ## 2. Endpoint index
@@ -70,6 +77,8 @@ by someone who walks slowly, and because the rubric caps specific failures.
 | `DELETE` | `/api/push/subscribe` | Unregister and delete stored trips |
 | `POST` | `/api/push/test` | Fire a warning now (judge-facing, D4) |
 | `GET`/`POST` | `/api/scenario` | Read/toggle the labelled demo scenario (D1, D2) |
+| `GET` | `/api/push/key` | VAPID **public** key, needed before subscribing |
+| `GET` | `/api/destinations` | The one destination this app plans to |
 
 ---
 
@@ -78,7 +87,7 @@ by someone who walks slowly, and because the rubric caps specific failures.
 ### `POST /api/trips`
 
 ```json
-{ "origin": { "label": "Blk 123 Bedok North St 2", "coord": [103.9312, 1.3271] },
+{ "origin": { "label": "Blk 208B New Upper Changi Road", "coord": [103.930570, 1.324782] },
   "destination_id": "SGH",
   "appointment_at": "2026-09-19T10:30:00+08:00",
   "preferences": { "walking_pace": "slow", "avoid_stairs": true, "prefer_sheltered": true } }
@@ -349,12 +358,33 @@ One request, cached by the service worker. Everything the underground leg needs 
 
 → `{ "subscribed": true, "checks": ["20:00 the evening before", "07:00 on the day"] }`
 
-`DELETE /api/push/subscribe` unregisters **and deletes stored trips** (§8 commitment 1).
+`subscription.endpoint` must be an `https` URL on a known push service
+(`fcm.googleapis.com`, `*.push.apple.com`, `*.notify.windows.com`,
+`updates.push.services.mozilla.com`). Anything else is `422`: the server POSTs to this
+URL, so an unrestricted one is an SSRF primitive.
 
-### `POST /api/push/test`
+### `DELETE /api/push/subscribe?endpoint=…`
+
+Unregisters **and deletes stored trips** (§8 commitment 1).
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `endpoint` | yes | The subscription to remove. Only this subscription and the trips linked to it are deleted. |
+
+`endpoint` is **required**. It was optional until F04, and omitting it deleted every
+subscription on the server together with all their trips.
+
+### `POST /api/push/test?trip_id=…`
 
 Fires a warning immediately through the real path so judges need not wait for 20:00 (D4).
 → `{ "sent": true, "note": "Test warning sent to this device." }`
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `trip_id` | yes | The trip to check and push for. |
+
+`trip_id` is **required**. It was optional until F05, and omitting it acted on the first
+trip in the database — pushing to another user's device and returning her trip id.
 
 ### Push payload
 
@@ -402,3 +432,109 @@ is actually rendered:
 - [ ] `step_free: "unknown"` is worded as unknown, never as inaccessible
 - [ ] `offline_notice` appears whenever the cached bundle is used
 - [ ] `checks.label` shown near any warning, so "we detect, not predict" is visible
+
+
+---
+
+## 10. What the built API adds or changes
+
+Written during the backend build (stages 1–9). Each entry says why, with the issue number in
+`PS2_BACKEND_PLAN.md` §2 where there is one.
+
+### Changed
+
+| Field | Change | Why |
+|---|---|---|
+| `POST /api/trips` → `origin` | Example origin is now **Blk 208B New Upper Changi Road** `[103.930570, 1.324782]` | The old example's coordinate was not the address it named. Geocoded properly, "Blk 123 Bedok North St 2" is 1,364 m from the station — a 32-minute walk at her pace (**I12**). |
+| `summary.timing_basis` | Wording is generated, and always says *scheduled* | GTFS is a timetable, not a stopwatch (D8). Example: `"Train ride is a scheduled 31 min, fixed by the timetable. A train every 2.5 min at this hour, so 0–2.5 min of waiting. 707 m of walking at an assumed 0.7 m/s."` |
+| `options[].option_id` | Adds **`leave_earlier`** alongside `leave_later` | D2.1's rule only covered a delay that fits her buffer. The Annex C replay is 20 min against a 15 min buffer, so that option vanished. For a trip not yet begun, the useful advice is to leave earlier (**I14**). |
+| `alternatives.options[].duration_min` | May be `null` | We only state a bus journey time when OneMap can time that service for that departure. Otherwise the bus is still offered and the time is left unstated rather than invented (**I15**). |
+| `tiles.tile_pack_url` | `null`, and now carries `tiles.unavailable_reason` | I6 is parked. The reason is returned so the UI can explain it rather than showing an empty map. |
+
+### Added
+
+| Field | On | Meaning |
+|---|---|---|
+| `rerouted` | `RouteStatus` | `true` when a live outage blocked a door the stored plan used and the plan was rebuilt. The stored plan is updated, so `steps_plain` agrees with the banner (**I16**). |
+| `summary.walk_distance_m` | `TripPlan` | Total walking metres, so the UI need not sum legs. |
+| `lift_alerts[].parsed_exits`, `.line_prefix`, `.station_id`, `.detail` | `RouteStatus` | What the `LiftDesc` parser actually read. `detail` is a ready-to-show sentence; the others let a judge check the parse. |
+| `disruption.on_her_route`, `.free_bus_islandwide` | `RouteStatus` | The island-wide free-bus string is matched loosely, since LTA writes it both hyphenated and not (T4). |
+| `crowd[].window` | `RouteStatus` | `[StartTime, EndTime]` of the 10-minute bucket the reading covers. |
+| `weather.areas[]` | `RouteStatus` | Which named forecast areas were read **and how far away they are** — the nearest to SGH is *City* at 1.66 km. Resolution is an area, never her street (§6 limitation 10). |
+| `bus.stops`, `.distance_km`, `.first_bus`, `.last_bus`, `.not_running` | `Alternatives` | From LTA route data. `not_running: true` is the honest reading of an empty arrival list outside operating hours (T17) — it does not mean no bus exists. |
+| `GET /api/push/key` | — | The browser needs the VAPID **public** key before it can subscribe. |
+| `GET /api/destinations` | — | One entry, SGH. Keeps the destination out of the frontend as a literal. |
+| `POST /api/push/test` → `payload` | — | When no browser has subscribed, the response carries the message that *would* have been sent, so a judge can read it without pairing a device. |
+
+### Documented above but not emitted
+
+Recorded after the PR #1 review. Each was verified against the running API on
+2026-09-18, not inferred from the prose.
+
+| Field | State | Why |
+|---|---|---|
+| `TripPlan.observed_at` | **Never emitted.** | A plan is derived from committed build-time data, not from an upstream read, so there is no observation time to report. The live blocks in `RouteStatus` each carry their own `observed_at`. |
+| `access.lift_id` | **Absent.** | `v2/FacilitiesMaintenance` gives a `LiftID` only for a lift that is *out*. There is no roster of working lifts to name one from, so a lift is identified only when an outage names it, on `lift_alerts[].lift_id`. |
+| `weather.area` | **Removed**, replaced by `weather.areas[]`. | §10 recorded the addition but not the removal. Two areas are read (home and hospital), so a single `area` could not say which one a reading came from. |
+| `options[].delta_min` | `null` for taxi always, and for bus unless OneMap timed that service. | `delta_min` is derived from `duration_min`, which is only stated when measured (**I15**). Rather than invent a figure, the option is offered with the comparison left blank. |
+| `options[].option_id: "leave_later"` | Never changes the leave time. | It is the "your buffer absorbs this" option: `leave_by` is the original, labelled *"Leave at HH:MM as planned"*. The name is misleading and is kept only because the frontend checklist already refers to it. |
+| `GET /alternatives` | Returns bus and taxi even when `disruption` is `null`. | The options are useful on a clear day too, and suppressing them would make the screen appear broken. `disruption: null` is the signal that nothing is wrong, not an empty `options` array. |
+| `/openapi.json` | No response models; the documented `422` is FastAPI's `{"detail": [...]}` shape. | Routes return plain `dict`, so the generated schema is `{}` for every 200. It is machine truth for **requests only**. The 422 body the app actually returns is the `error` envelope of §1 — `app/main.py` overrides FastAPI's handler — so the generated 422 schema is wrong. |
+
+### Undocumented fields the API serves
+
+Present in responses, absent from the prose above. Listed so the frontend does not
+treat them as accidental.
+
+| Field | On | Meaning |
+|---|---|---|
+| `leave_by`, `leave_by_label`, `timing_basis` | `options[]` | Same meaning as on `TripPlan.summary`, restated per option so a card is self-contained. |
+| `preferences.buffer_min` | `POST /api/trips` request | Minutes of slack before the appointment. Appears in the response example but was never documented as a request field. Now bounded `0–120`. |
+| `sent_at`, `digest` | push payload | `sent_at` is when the check ran; `digest` is the dedupe key over title+body+source, so a repeat check does not re-notify. |
+| `trip_id` | `POST /api/push/test` | Required — see §7. |
+
+### Changed by the PR #1 review fixes
+
+Behaviour that differs from the prose above **because a finding was fixed**. The
+finding IDs are those of the review on PR #1.
+
+| Field | Now | Finding |
+|---|---|---|
+| `access.board_at.status`, `.alight_at.status` | `yes` when OSM tags that entrance `wheelchair=yes`, else `unknown`. It used to be hardcoded `unknown`. | F11 |
+| `legs[].step_free`, `summary.step_free` | May be `unknown` where it was previously always `yes`. A walk with no staircase edge through a door nobody has tagged is not *known* to be step-free, and the rail leg cannot be stronger than its two doors, since station interiors are unmapped (§6 limitation 8). | F11 |
+| `options[].step_free` (bus) | Derived from `bus.wheelchair_accessible`; `unknown` when that is `null`. Was always `yes`. | F23 |
+| `lift_alerts[].blocked_exit_refs` | **Added.** Every exit an outage takes out, not just the first. `exit_code` remains the first, for the single-exit field. Anything deciding where she may walk must read this list. | F02 |
+| `lift_alerts[].stale`, `crowd[].stale`, `weather.stale`, `disruption.stale`, `bus.stale` | **Added.** `source` stays `live \| simulated` as §1 requires; whether the reading is current is now its own per-block flag (§1 rule 4). Previously only the top-level `stale` said so. | F22 |
+| `bus.observed_at` | **Added.** The bus block had no observation time at all. Live arrival and `not_running` are also suppressed when departure is more than ~30 min away, since they describe a bus leaving now. | F22, F23 |
+| `RouteStatus.replan_failed` | **Added.** `true` when every step-free entrance we know of is out and no route could be built. `overall` is then `critical`. Previously this raised a 500. | F06 |
+| `options[].viable` | Now also set on `leave_earlier`, `false` when the suggested departure has already passed. | F24 |
+| Offline bundle `warnings[]` | **Added.** Never serves written steps without either a status snapshot or a warning saying it could not check. | F06 |
+| `trip_id` | Now `t_` + 22 URL-safe characters (e.g. `t_nNaI_QM1R7RZQ8KQ6vS1BA`), not the 4 shown in the examples above. It is the only access control on `GET`/`DELETE`/status/offline, one of which returns her home coordinate. | F30 |
+| `error.code` | Adds `NOT_FOUND`, `METHOD_NOT_ALLOWED` and `INTERNAL_ERROR`. Unknown routes, wrong methods and uncaught exceptions now use the §1 envelope instead of `{"detail": ...}` or text/plain. | F21 |
+| `422` responses | `coord` must be a 2-element pair in degrees; `buffer_min` `0–120`; `walking_pace` one of `slow \| normal` (the keys of `timing.PACE`, so §3's stated pair is correct and enforced); the appointment must be in the future and within 400 days. | F15 |
+| `subscription.endpoint` | Must be `https` on a known push service, else `422`. `results[].error` is a code (`PUSH_FAILED`, `ENDPOINT_NOT_ALLOWED`, `ENDPOINT_GONE`), never the upstream's response body. | F03 |
+
+### Still not reconciled
+
+- **§3's worked example is stale.** The origin was updated but the summary still shows
+  `leave_by` 09:24, `duration_min` 46, `range_min` [41, 51] and `sheltered_pct` 78. Measured
+  on 2026-09-18 for a 10:30 appointment at the API default (`prefer_sheltered=true`):
+  **09:19, 50, [45, 56], 60**, arriving 10:03–10:14. The `timing_basis` string and the
+  `access` block in §3.1 (`lift_id`, `status: "in_service"`) are illustrative and do not
+  match what is served — see the two tables above.
+- **§8's scenario shapes are wrong.** The GET/POST response shape is shown nested under
+  `scenarios`, and the POST body is never documented; posting the nested shape returns 200
+  and changes nothing. Only the flat body works. `{"enabled": false}` also cannot switch the
+  demo off while a sub-scenario is still true.
+- **`sheltered_pct` is always emitted**, not "only when rain is forecast" as §3 says.
+
+### Behaviour worth knowing
+
+- **Fetched on demand, never polled** — unchanged from §4, and now true of the plan too: `/status`
+  is what revises a stale plan.
+- **`PS2_USE_FIXTURES=1` runs the whole backend with no network**, serving recorded upstream
+  responses flagged `stale` with their capture time. The app also falls back to this on its own
+  when an upstream dies, so a screen must handle `stale: true` at any time.
+- **With no credentials at all**, planning, status, crowd and weather still work from committed
+  data and fixtures. Address search and push return `UPSTREAM_UNAVAILABLE` with a message naming
+  the missing credential.

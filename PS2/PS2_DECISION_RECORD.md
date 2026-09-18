@@ -163,7 +163,7 @@ The two datasets describe the same physical doors.
 
 ### 3.2 Live outage → exit
 
-**2 of 4 joined cleanly.**
+**2 of 4 joined cleanly.** *(Re-measured 17 Sep after the GTFS rework — see the note below.)*
 
 | Row | Outcome |
 |---|---|
@@ -180,6 +180,25 @@ rather than mis-routing her silently.
 
 Carry `2/4` into `WRITEUP.md` as a stated limitation. It is small, honest and checkable,
 which the rubric rewards over a large unverifiable figure.
+
+> **Re-measured at backend stage 4, 17 Sep 2026 — `2/4` stands, and the breakdown is the
+> better number to quote.** The matcher was reworked to key on GTFS `stop_code` and resolve
+> through `parent_station` (I3), and re-run against the same live feed. The figure did not move,
+> because the Stevens failure was never a keying problem: GTFS lists DT10's entrances as `1`–`5`,
+> exactly as the shapefile does, so the `(TEL)` lettered exits are absent from **both** LTA
+> sources and nothing we can key on reaches them.
+>
+> What the rerun does give us is a breakdown worth stating instead of a bare fraction:
+>
+> | | Count | |
+> |---|---|---|
+> | Rows naming an exit | **3 of 4** | Jelapang is an internal concourse-to-platform lift, correctly not an exit outage |
+> | Of those, resolved to a known exit | **2 of 3** | Hougang `Exit A`, Clarke Quay `Exit E` |
+> | Exit-level join overall | **2 of 4** | unchanged |
+>
+> The single failure is **detected, not silent**: Stevens resolves to `unmatched`, which renders
+> as "a lift at this station" and never names an exit we cannot confirm. Reproduce with
+> `backend/scripts/score_rules.py`.
 
 ---
 
@@ -282,9 +301,11 @@ State all of these. The brief credits stated assumptions and known limits.
    carries no date fields, so we **detect rather than predict**. We check her route at 20:00 the
    evening before and again at 07:00 on the day (D3). An outage that starts after the last check
    is not caught.
-2. **Exit join succeeds on 2 of 4 live rows.** Interchange stations with two operators
-   (Stevens) fail; internal lifts (Jelapang) have no exit to join to. Failures degrade to
-   station-level warnings, never to silent mis-routing.
+2. **Exit join succeeds on 2 of 4 live rows** — re-measured 17 Sep after the GTFS rework, and
+   unchanged by it. Of the 4, three name an exit at all (the fourth is an internal lift), and
+   two of those three resolve. The failure is Stevens, where the `(TEL)` lettered exits are
+   missing from **both** LTA exit sources, so no join key recovers them. Failures are detected
+   and degrade to a station-level warning, never to silent mis-routing.
 3. **Bedok has no elevators mapped in OSM.** We rely on entrance `wheelchair` tags plus the
    LTA lift feed at her origin.
 4. **Walking speed is assumed, not measured.** State the figure used. This matters more than
@@ -314,7 +335,8 @@ gets cut if time runs short. Decision numbers (D1–D14) are referenced from §5
 **D1. The demo lift outage is synthetic and labelled.** Live outages on 17 Sep were at Stevens,
 Hougang, Clarke Quay and Jelapang. None is on Bedok → Outram Park, and a real outage at either
 of her stations before judging is unlikely. We inject one outage at Outram Park in the exact
-`v2/FacilitiesMaintenance` shape and label it on screen and in `WRITEUP.md`. No poller.
+`v2/FacilitiesMaintenance` shape and label it on screen and in `WRITEUP.md`. No historical
+poller; the scheduled checks in D3 are unaffected.
 
 **D2. In an EWL disruption she gets three options, before she leaves home.** The scenario is a
 labelled replay of the Annex C lifecycle (S4 p.58–72). Bedok is in predefined free-shuttle area 3

@@ -34,9 +34,10 @@ From D14's never-cut list, the backend owes the frontend seven things:
 Raised rather than worked around. Four are factual corrections; four are gaps to close.
 
 **Status as of 17 Sep 2026:** I1 and I2 are **resolved** — D8 was amended in the decision record
-(see D8 in its §7.3). I3 is **partly applied**: D8 now names `parent_station` as the better key,
-but D7's matcher description is unchanged and the 2/4 join figure in §3.2 has not been
-re-measured. I6 is **parked** at the team's direction. I4, I5, I7 and I8 are open.
+(see D8 in its §7.3). I3 is **applied but partly falsified** — see the measurement appended to it
+below; the 2/4 join figure is re-measured at stage 4, not here. I6 is **parked** at the team's
+direction. **I4, I5, I7 and I8 are now all closed** — see the notes on each.
+I9–I17 were raised during the build and are all resolved or stated.
 
 ### I1 — D8 is wrong that GTFS gives "ride-time ranges" · ~~correction needed~~ **RESOLVED**
 
@@ -82,18 +83,144 @@ insurance for the demo path), but the automatic matcher should key on GTFS `stop
 resolve through `parent_station` before falling back to names. Re-measure the 2/4 figure after
 this change and update §3.2, §6 limitation 2 and trap T21 with whatever it becomes.
 
-### I4 — The GTFS response field is `link`, not `Link` · **parser trap**
+> **Measured at stage 1, 17 Sep — the Stevens half of this is wrong.** `parent_station` does
+> unify the interchanges exactly as claimed (28 of them, `EW16 ← {EW16, NE3, TE17}`,
+> `DT10 ← {DT10, TE11}`), and that is what decides whether an outage is on her route. But it does
+> **not** recover Stevens' `(TEL) EXIT A`: GTFS lists DT10's entrances as `1`–`5`, which is
+> precisely what the shapefile holds. The lettered TEL-side exits are absent from *both* LTA
+> sources, so no keying strategy available to us resolves that row. It stays a station-level
+> warning, and §6 limitation 2 stands as written. The real win from GTFS is different and still
+> large: it keys on `stop_code` (kills the name join, T21) and ships WGS84 (kills the SVY21
+> reprojection, T19).
+
+### I14 — D2.1's "leave later" has no answer when the delay exceeds her buffer · **extended**
+
+D2.1 offers *leave later* "when the delay parsed from `Message` fits within her buffer". The
+demo replay is Annex C's 20-minute delay and her buffer is 15 minutes, so the rule correctly
+declines — and D2's promised three options became two.
+
+For a trip she has **not yet started**, the useful advice is the mirror image: leave *earlier*.
+The service now emits `option_id: "leave_later"` when the delay fits and `"leave_earlier"` when
+it does not, keeping her on the step-free route either way. With the 20-minute replay she is told
+to *"Leave 5 minutes earlier"* — the delay less the slack already in the plan. This is an addition
+to `PS2_API_CONTRACT.md` §5, which lists only `leave_later`.
+
+### I15 — OneMap `numItineraries` is capped at 3, undocumented · **trap**
+
+`routingsvc/route?routeType=pt` returns **400 Bad Request** for `numItineraries` of 4 or more;
+1–3 return 200. Worse, the three it returns *vary between identical calls*, so a single-bus
+itinerary is not guaranteed to appear — an early version of the bus option silently vanished on
+some requests.
+
+The fix makes OneMap advisory rather than authoritative: the candidate services come from our own
+`bus_options.json`, and OneMap is consulted only to time them. If it times one, we show a measured
+journey time; if it times none, we still offer the bus and say the journey time is not stated
+rather than inventing one.
+
+### I16 — The stored plan went stale when a lift went out · **fixed**
+
+A plan is stored when she creates it, but conditions change afterwards. With the lift
+scenario armed, `/status` correctly reported *"Exit 6's lift is out"* while the stored plan —
+and therefore the offline step list she reads underground — still told her to **leave by Exit
+6**. The warning and the instructions disagreed, and the instructions were the ones she would
+follow.
+
+`build_status` now derives the effective plan from `plan_original` on every call, so a reroute
+is reversible when the outage clears (F07), and reports `rerouted: true` whenever the route she
+holds differs from the clear-day one. Verified end to end at the API default
+(`prefer_sheltered=true`): Exit 6 → **Exit 2**, leave 09:19 → 09:12, 707 m → 958 m, and
+`steps_plain` follows. The `/offline` bundle picks this up because it builds its snapshot
+through the same path.
+
+The exit changed from 7 to 2 with F08 and F11: Outram's own Exit 2 (16 m, `wheelchair=yes`) used
+to be overwritten by Cantonment's Exit 2, and the router preferred the nearer untagged Exit 7
+while still claiming `step_free: "yes"`. It now prefers a door OSM tags accessible.
+
+### I17 — Our walking route is 2.3× the straight line where OneMap manages 1.26× · **stated, not fixed**
+
+`verify_stepfree.py` compares both walks against OneMap. On the hospital leg we are **shorter**
+(412 m against 437 m). On the home leg we are **longer**: 284 m against OneMap's 153 m, where
+the straight line is 121 m. The path doubles back — at two thirds of the distance walked it is
+still 122 m from the exit — because OSM maps no pedestrian link past that side of the station.
+
+Not treated as a bug. Connecting nearby-but-unlinked nodes would invent pedestrian
+infrastructure, which for this persona is the dangerous direction to be wrong in. Going around
+over-estimates her walk and makes her leave earlier. The script prints both ratios so the
+difference is visible rather than buried, and `WRITEUP.md` should say so.
+
+### I12 — The contract's example home coordinate is not that address · **fixed**
+
+`PS2_API_CONTRACT.md` §3 shows origin `"Blk 123 Bedok North St 2"` at `[103.9312, 1.3271]`,
+about 340 m from Bedok station. Geocoded through OneMap, that address is actually at
+`[103.9373, 1.32919]` — **1,364 m by step-free foot route, a 32-minute walk at 0.7 m/s**. The
+coordinate and the label describe different places, and the walk the label implies is not one
+this persona would make.
+
+Her home is now **Blk 208B New Upper Changi Road** `[103.930570, 1.324782]`, a real address
+returned by OneMap, **284 m step-free from Bedok Exit B** (7 min at her pace). Set in
+`config.HOME_DEFAULT`. The contract's worked example should be refreshed to match.
+
+### I13 — Summing consecutive segment times silently drops dwell · **measured**
+
+`ridetimes.json` first stored only consecutive-station segments. Summing them for EW5→EW16 gives
+**24.00 min**, against the **30.67 min** the same feed reports end to end — because a segment is
+`arrival[b] − departure[a]` and so omits the **40 s dwell at each of the 10 intermediate
+stations** (10 × 40 s = 6.67 min, exactly the gap).
+
+The artefact now carries a `_pairs` block with 7,484 ordered station pairs measured end to end,
+and the planner reads that. Anything quoting a station-to-station time must use `_pairs`.
+
+### I9 — OneMap needs a token, and the DataMall key is not it · **resolved, token supplied**
+
+Plan §4 lists `sources/onemap.py` but nothing said where the credential comes from. Measured
+17 Sep: `common/elastic/search` returns `200` with results *and* an `"Authentication token
+missing"` error; `routingsvc/route` returns a hard **401**. The DataMall `AccountKey` does not
+work on OneMap — different agency. A token was supplied and is in `.env` as `ONEMAP_TOKEN`
+(JWT, expires **20 Sep 23:09 SGT** — after judging, but re-mint via `POST /api/auth/post/getToken`
+if it lapses).
+
+*How it is used:* geocoding for `/api/places/search`, and as the independent "plain foot route"
+baseline in `verify_stepfree.py` (D11). **Walking legs still route on our own OSM graph** —
+OneMap's walk router does not exclude `highway=steps` or know which lift is out, so D11's claim
+cannot rest on it. This also fills §8's `[routing service]` placeholder: OneMap sees her typed
+address at search time, and trip endpoints only in the offline verification script.
+
+### I10 — GTFS and `TrainStationExit` are the same survey, not two sources · **claim correction**
+
+Worth knowing before anyone writes "corroborated by two independent LTA datasets": of 585 exits
+present in both, **572 (97.8%) sit within 0.5 m of each other** and the median separation is
+exactly 0.00 m. They are one survey published twice.
+
+The shapefile still earns its place, for *coverage* rather than corroboration: it carries exits
+GTFS omits at 6 stations (Bugis 8 vs 4, Paya Lebar 6 vs 4, Telok Ayer 5 vs 3, Bukit Panjang,
+Choa Chu Kang, Tai Seng). `exits.geojson` is therefore the **union** — 603 exits, 591 from GTFS
+and 12 shapefile-only — with `source` on every feature.
+
+### I11 — A bbox OSM extract is not one connected graph · **routing trap**
+
+The corridor extract yields 198 components: Bedok (12,872 nodes) and Outram (5,873) as expected
+from two bboxes, but also **112 fragments of two nodes**. Snapping a trip to its nearest node
+lands on one of these — the nearest node to Outram Exit 4 is a 2-node stub, which made an
+existing 795 m walk look like "no path".
+
+`stepfree_graph.json` therefore ships a `components` map and `main_component_by_area`. The
+planner must snap only to nodes in the area's main component. Verified after the fix: home →
+Bedok Exit B is 1,351 m unrestricted with one staircase, **1,364 m step-free with none — a 13 m
+detour** — and Outram Exit 4 → SGH is 795 m, 66% sheltered, step-free either way.
+
+### I4 — The GTFS response field is `link`, not `Link` · ~~parser trap~~ **CLOSED**
 
 Guide v6.9 p.56 documents the attribute as `Link`. The live response returns lowercase `link`,
 plus an **undocumented `timestamp`**. A parser written from the documentation returns `KeyError`.
-Add to `PS2_INDEX.md` as a trap.
+Added to `PS2_INDEX.md` as trap T22. `build_data.py` reads `link` and falls back to `Link`, so
+it survives LTA fixing this either way.
 
-### I5 — "No poller" (D1) reads as contradicting the 20:00/07:00 checks (D3) · **wording**
+### I5 — "No poller" (D1) reads as contradicting the 20:00/07:00 checks (D3) · ~~wording~~ **CLOSED**
 
 D1 ends "No poller." D3 requires scheduled checks at 20:00 and 07:00, which is a scheduled
 process. These are different things — D1 means no historical accumulation of outage data — but
-the bare phrase invites a judge's question. Suggest D1 read "No historical poller; the scheduled
-checks in D3 are unaffected."
+the bare phrase invites a judge's question. **Applied:** D1 now reads "No historical poller; the
+scheduled checks in D3 are unaffected."
 
 ### I6 — D6's offline tiles depend on an unmade decision · **PARKED** by the team
 
@@ -103,20 +230,23 @@ D6 caches map tiles for her route offline, "only as the tile provider's terms al
 filled with a provider whose terms permit offline caching. This also blocks the privacy
 statement. **Decide this before any frontend map work.**
 
-### I7 — "Nearest" barrier-free taxi stand is undefined · **small spec gap**
+### I7 — "Nearest" barrier-free taxi stand is undefined · ~~small spec gap~~ **CLOSED**
 
 D2.3 offers "the nearest `TaxiStands` entry flagged `Bfa`". Nearest to what? She has no live
 location (§8 commitment 2). It must mean nearest to the station she is at or heading to.
 
 Verified this works: of 316 taxi stands, **293 are `Bfa=Yes`**, and the nearest to SGH is
 `Outram Rd outside Outram Park MRT Station` at **478 m** — the right answer, directly outside her
-interchange. Specify the anchor explicitly as "her current leg's station".
+interchange. **Applied:** the anchor is the station the current leg is heading to, passed explicitly to
+`_taxi_option`. For her trip that is `EW16`, and the stand comes back at **32 m** — measured from
+the station coordinate rather than the 478 m quoted here, which was measured from the hospital.
 
-### I8 — §9's "five minutes" link expiry is now partly stale · **minor**
+### I8 — §9's "five minutes" link expiry is now partly stale · ~~minor~~ **CLOSED**
 
 §9 says `GeospatialWholeIsland` links are "valid for five minutes only". Under v6.9 several
 download links are documented at 15 minutes, and GTFS is confirmed at 15. Harmless (downloading
-immediately is correct either way) but worth a footnote.
+immediately is correct either way) but worth a footnote. **Applied:** `build_data.py` downloads
+each link immediately and never stores one, so the expiry never matters in practice.
 
 **None of these change the persona decision or D14's never-cut list.** I1, I3 and I6 change what
 gets built; the rest are documentation fixes.
@@ -277,15 +407,15 @@ needs to know in the Notes column.
 
 | # | Stage | Delivers | Status | Notes |
 |---|---|---|---|---|
-| 1 | **Data pipeline** (§5) — `scripts/build_data.py` | `stations.json`, `exits.geojson`, `headways.json`, `stepfree_graph.json` | `not started` | Nothing else is testable without this. Includes the I3 matcher rework — do it here, not later. |
-| 2 | **Sources + cache** (§6) | `app/sources/*` with recorded fixtures | `not started` | Fixtures let dev run without hammering upstream, and make the demo survive a dead network. |
-| 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `not started` | Everything else decorates this. Timing range from headway + pace, never ride time (I1). |
-| 4 | **Lift matcher + reroute** | Capability 2 | `not started` | The product's whole point. Re-measure the §3.2 join rate here and report the new figure. |
-| 5 | **Scenario layer** (§7) | Labelled injection for D1/D2 | `not started` | Must exist before the demo path is built on top of it. |
-| 6 | **Disruption alternatives** | Capability 3 | `not started` | Biggest single service. Three options per D2, shown against the original. |
-| 7 | **Push + scheduler** | Capability 6 — 20:00 / 07:00 checks | `not started` | Include `POST /api/push/test` so judges need not wait. |
-| 8 | **Offline bundle + crowd + weather** | Capabilities 4, 5, 7 | `not started` | Smallest and most cuttable. Offline tiles are parked (I6) — ship `tile_pack_url: null`. |
-| 9 | **Claim scripts** | `verify_stepfree.py` (D11), `score_rules.py` (D13) | `not started` | These produce the write-up's numbers. Must run **before** submission, not after. |
+| 1 | **Data pipeline** (§5) — `scripts/build_data.py` | `stations.json`, `line_codes.json`, `exits.geojson`, `ridetimes.json`, `headways.json`, `stepfree_graph.json`, `covered_ways.geojson` | `done` | Run 17 Sep against live feeds; outputs committed under `backend/data/derived/`. Reproduces both recorded figures exactly: EW5→EW16 is 30.67 min across all 698 trips (I1/T24), EW5 weekday headway 2.5 min at 08h / 5.0 off-peak (D8). **For later stages:** exits are a 603-row union, `source` per feature (I10); snap walking legs via `components` + `main_component_by_area` or you will land on one of 112 two-node stubs (I11); shelter is LTA `CoveredLinkWay` ∪ OSM tags. |
+| 2 | **Sources + cache** (§6) | `app/sources/*` with recorded fixtures | `done` | All five adapters exercised live 17 Sep. Fixtures auto-record to `backend/data/fixtures/` on every successful fetch; `PS2_USE_FIXTURES=1` runs the whole backend with no network. Verified three degradation paths: fixtures-only, upstream-unreachable→fixture, and both auth failures. **T18 was re-measured and corrected** — a wrong key gives 401, a missing key gives the ambiguous 404. |
+| 3 | **Planner** | Capability 1 — step-free Bedok → SGH, `leave_by`, `timing.py` | `done` | Serves `POST/GET/DELETE /api/trips`, `/api/places/search`, `/api/health`, `/api/attribution`. Plan for a 10:30 appointment: **leave 09:19, arrive 10:03–10:14**, 696 m walking, step-free, 60% sheltered. Range narrows correctly at peak (44–52 min at 08:30 vs 44–55 off-peak) because the only live input is headway. **For later stages:** her home is now a real geocoded address (I12); ride time must come from `ridetimes._pairs`, not summed segments (I13); `services/lifts.py` is a stub that stage 4 replaces. |
+| 4 | **Lift matcher + reroute** | Capability 2 | `done` | Rules-based `LiftDesc` parser with three outcomes (`matched_exit` / `unmatched` / `station_only`). **Join re-measured: 2/4 stands** — 3 of 4 rows name an exit, 2 of those 3 resolve; decision record §3.2 and limitation 2 updated. Reroute verified at the API default (`prefer_sheltered=true`): with Exit 6's lift out she is moved to **Exit 2** (`wheelchair=yes`), +251 m, leaving 7 min earlier (09:19 → 09:12). Serves `GET /api/trips/{id}/status`. **Re-measured after F01/F02/F07/F08/F11:** a lift naming two exits now blocks both; `unmatched` and `station_only` outages no longer claim "your route does not use it"; the reroute is undone when the outage clears; entrances are matched to their own station; and an untagged door reports `step_free: "unknown"` rather than `"yes"`. |
+| 5 | **Scenario layer** (§7) | Labelled injection for D1/D2 | `done` | `app/scenario.py` is the only module producing synthetic records. Verified every simulated object carries `source` + `simulated_note`, and that the 4 real outages stay `live` in the same array as the 1 simulated one. Toggle via `GET/POST /api/scenario`, default off. |
+| 6 | **Disruption alternatives** | Capability 3 | `done` | `GET /api/trips/{id}/alternatives`. Three options against the original, each with a `why` and a signed `delta_min`. **Which** bus comes from `bus_options.json` — four real direct Bedok→SGH services derived from `BusRoutes`, two of which alight at SGH Block 3 — and **how long** it takes from OneMap PT, with live `WAB`/`Load`/`Monitored` from `v3/BusArrival`. See I14 (leave-earlier) and I15 (OneMap caps `numItineraries` at 3). |
+| 7 | **Push + scheduler** | Capability 6 — 20:00 / 07:00 checks | `done` | APScheduler on `Asia/Singapore`: 20:00 (36 h horizon), 07:00 (today), 03:00 retention sweep. VAPID keys generated by `scripts/gen_vapid.py`, private key in `.env` only. Verified: repeat checks report `unchanged` and do not re-send (digest in `sent`), the sweep deletes trips >24 h past appointment, and unsubscribing deletes stored trips. `POST /api/push/test` returns the payload it *would* send when no browser has subscribed, so judges see the message without a device. |
+| 8 | **Offline bundle + crowd + weather** | Capabilities 4, 5, 7 | `done` | `GET /api/trips/{id}/offline` returns the plan, a status snapshot and `steps_plain`. `tile_pack_url` is `null` per the parked I6, with `unavailable_reason` stated. Crowd badges and the rain policy landed with `/status` in stage 4. Weather names the area it read — **"City" at 1.66 km is the nearest to SGH**, so limitation 10 should name it. Found and fixed here: the stored plan went stale when a lift went out (I16). |
+| 9 | **Claim scripts** | `verify_stepfree.py` (D11), `score_rules.py` (D13) | `done` | `score_rules.py` → **16/16** (10 `LiftDesc` rows, 4 of them live; 6 messages). `verify_stepfree.py` → **PASS**, and prints our route beside OneMap's independent foot route. Both exit non-zero on failure. Examples ship in `data/handchecked/`. No Telegram notices used — `PS2_README.md:L207` says to ask first, and we have not. |
 
 D14's cut order if time runs short: taxi option → live bus checks → GTFS headways (but keep
 `stations.json` — see D14 note).

@@ -6,3 +6,10 @@
 
 # Local scratch
 generated_temp/
+
+# PS2 backend — virtualenv and raw upstream cache (derived outputs ARE committed)
+PS2/backend/.venv/
+PS2/backend/data/cache/
+__pycache__/
+*.pyc
+PS2/backend/data/ps2.sqlite3
