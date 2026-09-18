@@ -5,10 +5,14 @@ fact below carries a pointer to where it came from, so a future session can jump
 to the source instead of re-reading the pack. Nothing here is a design decision — this is
 what the organisers said, plus what was measured directly from the provided files.
 
-**Status:** exploration/brainstorming only. No implementation started.
+**Status:** backend built and under review. Stages 1–9 of `PS2_BACKEND_PLAN.md` §9 are
+`done`; the frontend has not been started. The 34 findings of the PR #1 review are
+reconciled — see that PR and `PS2_API_CONTRACT.md` §10 for what changed.
 **Compiled:** 2026-09-17, against repo commit `16526c0` (clean tree).
-**Repo root:** `/home/zachary/Projects/nebulax_lta/NebulaX-Hackathon-ProblemStatement`
-All paths below are relative to `PS2/` unless prefixed with `../`.
+**Revised:** 2026-09-18, after the PR #1 review pass.
+**Repo root:** the checkout containing this `PS2/` directory. Paths below are relative to
+`PS2/` unless prefixed with `../`; no absolute path is recorded here, because the one that
+used to be (a `/home/...` developer path) was true only on one machine.
 
 ---
 
@@ -28,8 +32,8 @@ All paths below are relative to `PS2/` unless prefixed with `../`.
 | S9 | `submission/README.md` (119 lines) | **How to package and hand in.** Repo layout, README requirements, credential rules, claims rules, pre-submission checklist. | Logistics (where/when to submit) are still `TBC` — see §8. |
 | S10 | `../README.md` | Repo-wide overview covering PS1/PS2/PS3 + DataMall quick start. | Contains three broken references — see §7.1. |
 | S11 | `PS2_DECISION_RECORD.md` *(ours)* | **Why we build for Mdm Lim.** The three pre-commitment checks, their live-API results, the end-to-end join validation, the limitations to carry into `WRITEUP.md`, the build decisions D1–D14 (§7) and a draft privacy statement (§8). | Written 17 Sep 2026. Read this before re-litigating the persona choice. |
-| S13 | `PS2_BACKEND_PLAN.md` *(ours)* | **How the backend gets built**, plus eight issues found in the decision record (I1–I8) — including that GTFS ride time is fixed, not a range. | Written 17 Sep 2026. Read §2 before acting on D7 or D8. |
-| S14 | `PS2_API_CONTRACT.md` *(ours)* | **Every field the backend serves the frontend**, with worked JSON. FastAPI's `/openapi.json` is the machine truth. | Frontend can start against this before the backend exists. |
+| S13 | `PS2_BACKEND_PLAN.md` *(ours)* | **How the backend gets built**, plus the issues found while building it (**I1–I17**) — including that GTFS ride time is fixed, not a range. §9 carries the per-stage build status. | Written 17 Sep 2026; §2 grew from I1–I8 to I1–I17 during the build. Read §2 before acting on D7 or D8. |
+| S14 | `PS2_API_CONTRACT.md` *(ours)* | **Every field the backend serves the frontend**, with worked JSON. FastAPI's `/openapi.json` is the machine truth. | The backend now exists and serves all of this. **Read §10 first** — it records where the built API differs from the prose above it. `/openapi.json` currently has no response models, so it is machine truth for requests only. |
 | S12 | `evidence/` *(ours)* | Timestamped captures backing claims in S11 — currently the `v2/FacilitiesMaintenance` snapshot. | Ship these: the brief requires captured data for any live-feed claim. |
 
 **Not in the repo but named as required reading:** the DataMall portal's static master lists

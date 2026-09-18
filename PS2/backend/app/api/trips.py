@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, conlist, field_validator
 
 from .. import data, store
 from ..config import ATTRIBUTION, HOME_DEFAULT, SGT, SGH, USE_FIXTURES
-from ..services import planner
+from ..services import planner, timing
 from ..sources import onemap
 
 router = APIRouter()
@@ -19,7 +19,9 @@ router = APIRouter()
 # An appointment outside this window is a typo, not a plan (F15). Generous on
 # both sides: she may well book a year out.
 MAX_APPOINTMENT_DAYS = 400
-PACES = ("slow", "steady", "brisk")
+# Exactly the keys of `timing.PACE`. Inventing names here would 422 a pace the
+# planner supports, and silently fall back to slow for one it does not (F15).
+PACES = tuple(timing.PACE)
 
 
 class Preferences(BaseModel):

@@ -87,18 +87,32 @@ def test_appointments_outside_a_sane_window_are_rejected(client, when):
     assert response.status_code == 422
 
 
-def test_walking_pace_is_an_enum(client):
+@pytest.mark.parametrize("pace", ["sprint", "steady", "brisk"])
+def test_walking_pace_is_an_enum(client, pace):
     """'sprint' was accepted, stored, and silently planned as slow."""
     response = client.post("/api/trips", json={
-        "appointment_at": FUTURE, "preferences": {"walking_pace": "sprint"}})
+        "appointment_at": FUTURE, "preferences": {"walking_pace": pace}})
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize("pace", ["slow", "normal"])
+def test_every_pace_the_planner_supports_is_accepted(client, pace):
+    """The enum must be exactly `timing.PACE`. An invented name would reject a
+    pace the planner handles, and accept one it silently treats as slow."""
+    from app.services import timing
+
+    assert pace in timing.PACE
+    response = client.post("/api/trips", json={
+        "appointment_at": FUTURE, "preferences": {"walking_pace": pace}})
+
+    assert response.status_code == 200
 
 
 def test_a_valid_request_still_plans(client):
     response = client.post("/api/trips", json={
         "appointment_at": FUTURE,
-        "preferences": {"walking_pace": "steady", "buffer_min": 20}})
+        "preferences": {"walking_pace": "normal", "buffer_min": 20}})
 
     assert response.status_code == 200
     assert response.json()["summary"]["buffer_min"] == 20

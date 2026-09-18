@@ -466,6 +466,68 @@ Written during the backend build (stages 1–9). Each entry says why, with the i
 | `GET /api/destinations` | — | One entry, SGH. Keeps the destination out of the frontend as a literal. |
 | `POST /api/push/test` → `payload` | — | When no browser has subscribed, the response carries the message that *would* have been sent, so a judge can read it without pairing a device. |
 
+### Documented above but not emitted
+
+Recorded after the PR #1 review. Each was verified against the running API on
+2026-09-18, not inferred from the prose.
+
+| Field | State | Why |
+|---|---|---|
+| `TripPlan.observed_at` | **Never emitted.** | A plan is derived from committed build-time data, not from an upstream read, so there is no observation time to report. The live blocks in `RouteStatus` each carry their own `observed_at`. |
+| `access.lift_id` | **Absent.** | `v2/FacilitiesMaintenance` gives a `LiftID` only for a lift that is *out*. There is no roster of working lifts to name one from, so a lift is identified only when an outage names it, on `lift_alerts[].lift_id`. |
+| `weather.area` | **Removed**, replaced by `weather.areas[]`. | §10 recorded the addition but not the removal. Two areas are read (home and hospital), so a single `area` could not say which one a reading came from. |
+| `options[].delta_min` | `null` for taxi always, and for bus unless OneMap timed that service. | `delta_min` is derived from `duration_min`, which is only stated when measured (**I15**). Rather than invent a figure, the option is offered with the comparison left blank. |
+| `options[].option_id: "leave_later"` | Never changes the leave time. | It is the "your buffer absorbs this" option: `leave_by` is the original, labelled *"Leave at HH:MM as planned"*. The name is misleading and is kept only because the frontend checklist already refers to it. |
+| `GET /alternatives` | Returns bus and taxi even when `disruption` is `null`. | The options are useful on a clear day too, and suppressing them would make the screen appear broken. `disruption: null` is the signal that nothing is wrong, not an empty `options` array. |
+| `/openapi.json` | No response models; the documented `422` is FastAPI's `{"detail": [...]}` shape. | Routes return plain `dict`, so the generated schema is `{}` for every 200. It is machine truth for **requests only**. The 422 body the app actually returns is the `error` envelope of §1 — `app/main.py` overrides FastAPI's handler — so the generated 422 schema is wrong. |
+
+### Undocumented fields the API serves
+
+Present in responses, absent from the prose above. Listed so the frontend does not
+treat them as accidental.
+
+| Field | On | Meaning |
+|---|---|---|
+| `leave_by`, `leave_by_label`, `timing_basis` | `options[]` | Same meaning as on `TripPlan.summary`, restated per option so a card is self-contained. |
+| `preferences.buffer_min` | `POST /api/trips` request | Minutes of slack before the appointment. Appears in the response example but was never documented as a request field. Now bounded `0–120`. |
+| `sent_at`, `digest` | push payload | `sent_at` is when the check ran; `digest` is the dedupe key over title+body+source, so a repeat check does not re-notify. |
+| `trip_id` | `POST /api/push/test` | Required — see §7. |
+
+### Changed by the PR #1 review fixes
+
+Behaviour that differs from the prose above **because a finding was fixed**. The
+finding IDs are those of the review on PR #1.
+
+| Field | Now | Finding |
+|---|---|---|
+| `access.board_at.status`, `.alight_at.status` | `yes` when OSM tags that entrance `wheelchair=yes`, else `unknown`. It used to be hardcoded `unknown`. | F11 |
+| `legs[].step_free`, `summary.step_free` | May be `unknown` where it was previously always `yes`. A walk with no staircase edge through a door nobody has tagged is not *known* to be step-free, and the rail leg cannot be stronger than its two doors, since station interiors are unmapped (§6 limitation 8). | F11 |
+| `options[].step_free` (bus) | Derived from `bus.wheelchair_accessible`; `unknown` when that is `null`. Was always `yes`. | F23 |
+| `lift_alerts[].blocked_exit_refs` | **Added.** Every exit an outage takes out, not just the first. `exit_code` remains the first, for the single-exit field. Anything deciding where she may walk must read this list. | F02 |
+| `lift_alerts[].stale`, `crowd[].stale`, `weather.stale`, `disruption.stale`, `bus.stale` | **Added.** `source` stays `live \| simulated` as §1 requires; whether the reading is current is now its own per-block flag (§1 rule 4). Previously only the top-level `stale` said so. | F22 |
+| `bus.observed_at` | **Added.** The bus block had no observation time at all. Live arrival and `not_running` are also suppressed when departure is more than ~30 min away, since they describe a bus leaving now. | F22, F23 |
+| `RouteStatus.replan_failed` | **Added.** `true` when every step-free entrance we know of is out and no route could be built. `overall` is then `critical`. Previously this raised a 500. | F06 |
+| `options[].viable` | Now also set on `leave_earlier`, `false` when the suggested departure has already passed. | F24 |
+| Offline bundle `warnings[]` | **Added.** Never serves written steps without either a status snapshot or a warning saying it could not check. | F06 |
+| `trip_id` | Now `t_` + 22 URL-safe characters (e.g. `t_nNaI_QM1R7RZQ8KQ6vS1BA`), not the 4 shown in the examples above. It is the only access control on `GET`/`DELETE`/status/offline, one of which returns her home coordinate. | F30 |
+| `error.code` | Adds `NOT_FOUND`, `METHOD_NOT_ALLOWED` and `INTERNAL_ERROR`. Unknown routes, wrong methods and uncaught exceptions now use the §1 envelope instead of `{"detail": ...}` or text/plain. | F21 |
+| `422` responses | `coord` must be a 2-element pair in degrees; `buffer_min` `0–120`; `walking_pace` one of `slow \| normal` (the keys of `timing.PACE`, so §3's stated pair is correct and enforced); the appointment must be in the future and within 400 days. | F15 |
+| `subscription.endpoint` | Must be `https` on a known push service, else `422`. `results[].error` is a code (`PUSH_FAILED`, `ENDPOINT_NOT_ALLOWED`, `ENDPOINT_GONE`), never the upstream's response body. | F03 |
+
+### Still not reconciled
+
+- **§3's worked example is stale.** The origin was updated but the summary still shows
+  `leave_by` 09:24, `duration_min` 46, `range_min` [41, 51] and `sheltered_pct` 78. Measured
+  on 2026-09-18 for a 10:30 appointment at the API default (`prefer_sheltered=true`):
+  **09:19, 50, [45, 56], 60**, arriving 10:03–10:14. The `timing_basis` string and the
+  `access` block in §3.1 (`lift_id`, `status: "in_service"`) are illustrative and do not
+  match what is served — see the two tables above.
+- **§8's scenario shapes are wrong.** The GET/POST response shape is shown nested under
+  `scenarios`, and the POST body is never documented; posting the nested shape returns 200
+  and changes nothing. Only the flat body works. `{"enabled": false}` also cannot switch the
+  demo off while a sub-scenario is still true.
+- **`sheltered_pct` is always emitted**, not "only when rain is forecast" as §3 says.
+
 ### Behaviour worth knowing
 
 - **Fetched on demand, never polled** — unchanged from §4, and now true of the plan too: `/status`
