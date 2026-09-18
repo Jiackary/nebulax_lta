@@ -290,22 +290,28 @@ class Disruption(Schema):
 
 
 class Crowd(Schema):
-    station_code: str
-    station_name: str
+    # Straight from the upstream row with no defaults, so a sparse reading
+    # gives nulls rather than an absent block. Typing them as required would
+    # turn a cosmetic gap in one badge into a 500 for the whole status call.
+    station_code: str | None
+    station_name: str | None
     level: str
     label: str
     severity: Severity
-    window: list[str] = Field(description="[start, end] of the 10-minute bucket.")
+    window: list[str | None] = Field(
+        description="[start, end] of the 10-minute bucket; null when the row omits them.")
     source: Literal["live", "simulated"]
     stale: bool
     observed_at: str
 
 
 class WeatherArea(Schema):
-    name: str
+    name: str | None = Field(
+        description="Null when the nowcast carried no areas — an upstream outage.")
     for_: str = Field(alias="for", description="Which end of the trip this area covers.")
-    distance_km: float
-    forecast: str
+    distance_km: float | None = Field(
+        description="Null when no area could be placed — the distance is then unbounded.")
+    forecast: str | None
 
 
 class Weather(Schema):
@@ -332,7 +338,9 @@ class RouteStatus(Schema):
     disruption: Disruption | None = Field(
         description="Null on a quiet day — there is no advisory to report.")
     crowd: list[Crowd]
-    weather: Weather
+    weather: Weather | None = Field(
+        description="Null when the nowcast could not be read at all; the rest of "
+                    "the overlay is still served.")
     checks: Checks
     rerouted: bool = Field(
         description="The stored plan was rebuilt because an outage blocked a door it used.")
@@ -377,7 +385,7 @@ class BusInfo(Schema):
 
 
 class TaxiStand(Schema):
-    name: str
+    name: str | None
     coord: Coord
     distance_m: int | None
     barrier_free: bool | None
