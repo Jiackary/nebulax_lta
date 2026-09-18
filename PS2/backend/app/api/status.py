@@ -5,9 +5,10 @@ import json
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .. import data, scenario, store
+from . import schemas
 from ..config import DEST_STATION, ORIGIN_STATION, SGT
 from ..services import crowd as crowd_service
 from ..services import disruption as disruption_service
@@ -237,7 +238,9 @@ def _overall(alerts: list[dict], disruption: dict | None, wx: dict | None,
             "action": {"kind": "view_trip", "label": "See your trip"}}
 
 
-@router.get("/trips/{trip_id}/status")
+@router.get("/trips/{trip_id}/status", response_model=schemas.RouteStatus,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 async def trip_status(trip_id: str):
     trip = store.get_trip(trip_id)
     if not trip:
@@ -245,17 +248,54 @@ async def trip_status(trip_id: str):
     return await build_status(trip)
 
 
-class ScenarioRequest(BaseModel):
-    enabled: bool | None = None
+class ScenarioFlags(BaseModel):
+    """The demo switches, in the shape `GET /api/scenario` returns them."""
+    model_config = ConfigDict(extra="forbid")
+
     lift_outage_outram: bool | None = None
     ewl_disruption: bool | None = None
 
 
-@router.get("/scenario")
+class ScenarioRequest(BaseModel):
+    """Either the flat body or the nested one `GET /api/scenario` returns.
+
+    The nested shape is what contract §8 documents and what a screen already
+    holds after reading the state, so posting it back has to work. It used to
+    return `200` and change nothing: the field did not exist, and Pydantic
+    dropped it silently. That is the worst failure available to an API — the
+    caller is told it succeeded.
+
+    `extra="forbid"` closes the same trap for typos: `{"lift_outage": true}`
+    is now a `422` naming the field rather than a cheerful no-op.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool | None = None
+    scenarios: ScenarioFlags | None = None
+    lift_outage_outram: bool | None = None
+    ewl_disruption: bool | None = None
+    # Accepted only so the GET response round-trips unchanged. Ignored.
+    note: str | None = None
+
+    def flags(self) -> dict[str, bool | None]:
+        """The flat switches, with anything nested folded in on top."""
+        flat = {"lift_outage_outram": self.lift_outage_outram,
+                "ewl_disruption": self.ewl_disruption}
+        if self.scenarios is not None:
+            flat.update({k: v for k, v in self.scenarios.model_dump().items()
+                         if v is not None})
+        return flat
+
+
+@router.get("/scenario", response_model=schemas.ScenarioState,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def get_scenario():
     return scenario.state()
 
 
-@router.post("/scenario")
+@router.post("/scenario", response_model=schemas.ScenarioState,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def set_scenario(req: ScenarioRequest):
-    return scenario.set_state(**req.model_dump())
+    return scenario.set_state(enabled=req.enabled, **req.flags())
