@@ -397,6 +397,10 @@ python3 -m venv "$SP/venv"
 
 ## 10. Quick pointers
 
+Current implementation overview and diagrams: [PS2_ARCHITECTURE.md](PS2_ARCHITECTURE.md).
+Core frontend implementation plan: [PS2_FRONTEND_PLAN.md](PS2_FRONTEND_PLAN.md).
+Separate read-aloud engineer handoff: [PS2_READ_ALOUD_HANDOFF.md](PS2_READ_ALOUD_HANDOFF.md).
+
 | I need… | Go to |
 |---|---|
 | What we're being asked to build | `PS2_README.md:L1–L12`, §2 above |
