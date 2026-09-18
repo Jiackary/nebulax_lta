@@ -4,13 +4,16 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from .. import scenario, store
+from . import schemas
 from ..services import alternatives as alt_service
 from ..services import disruption as disruption_service
 
 router = APIRouter()
 
 
-@router.get("/trips/{trip_id}/alternatives")
+@router.get("/trips/{trip_id}/alternatives", response_model=schemas.Alternatives,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 async def trip_alternatives(trip_id: str):
     trip = store.get_trip(trip_id)
     if not trip:

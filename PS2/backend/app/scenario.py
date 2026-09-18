@@ -66,12 +66,23 @@ def state() -> dict:
 
 
 def set_state(enabled: bool | None = None, **scenarios) -> dict:
-    if enabled is not None:
-        _state["enabled"] = bool(enabled)
+    """Arm or disarm the demo.
+
+    Arming a sub-scenario arms the demo, so a screen need not send both. But an
+    explicit `enabled` always wins: the old rule re-enabled the demo whenever
+    any sub-scenario was still true, which meant `{"enabled": false}` could not
+    switch it off at all. The master switch is what `_on()` reads, so turning it
+    off silences everything while remembering which scenarios were armed.
+    """
+    armed_something = False
     for k, v in scenarios.items():
         if k in _state and v is not None:
             _state[k] = bool(v)
-    if any(_state[k] for k in ("lift_outage_outram", "ewl_disruption")):
+            armed_something = armed_something or bool(v)
+
+    if enabled is not None:
+        _state["enabled"] = bool(enabled)
+    elif armed_something:
         _state["enabled"] = True
     return state()
 

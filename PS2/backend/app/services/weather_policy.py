@@ -32,8 +32,16 @@ def assess(nowcast: dict, stale: bool = False,
                  if prefer_sheltered else
                  f"Rain forecast in {where} in the next 2 hours. Your route is not "
                  f"weighted towards shelter — you can turn that on in your preferences.")
+    elif home_fc is None and sgh_fc is None:
+        # No forecast was read at all — an empty nowcast, or an area we could not
+        # place. `is_wet(None)` is False, which is not the same as "it is dry",
+        # and the old wording claimed the latter: "No rain forecast for None or
+        # None in the next 2 hours". Unknown is not no (§6 limitation 5).
+        label = "We could not read the rain forecast for the next 2 hours."
     else:
-        label = f"No rain forecast for {home_area} or {sgh_area} in the next 2 hours"
+        named = " or ".join(a for a in (home_area, sgh_area) if a)
+        label = (f"No rain forecast for {named} in the next 2 hours" if named
+                 else "No rain forecast in the next 2 hours")
 
     return {
         "rain_expected": rain,

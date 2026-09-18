@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 
 from .. import store
+from . import schemas
 from ..config import VAPID_CLAIM_EMAIL, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY
 from ..services import notify
 
@@ -88,7 +89,9 @@ async def send_push_async(subscription: dict, payload: dict) -> tuple[bool, str 
     return await asyncio.to_thread(send_push, subscription, payload)
 
 
-@router.get("/push/key")
+@router.get("/push/key", response_model=schemas.PushKey,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def push_key():
     """The browser needs the public key to subscribe. Never the private one."""
     if not VAPID_PUBLIC_KEY:
@@ -98,14 +101,18 @@ def push_key():
     return {"public_key": VAPID_PUBLIC_KEY}
 
 
-@router.post("/push/subscribe")
+@router.post("/push/subscribe", response_model=schemas.Subscribed,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def subscribe(req: SubscribeRequest):
     store.save_subscription(req.subscription.endpoint, req.subscription.keys, req.trip_ids)
     return {"subscribed": True,
             "checks": ["20:00 the evening before", "07:00 on the day"]}
 
 
-@router.delete("/push/subscribe")
+@router.delete("/push/subscribe", response_model=schemas.Unsubscribed,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def unsubscribe(endpoint: str):
     """Unsubscribing also deletes her stored trips (privacy commitment 1).
 
@@ -118,7 +125,9 @@ def unsubscribe(endpoint: str):
             "note": "Your saved trips have been deleted from the server."}
 
 
-@router.post("/push/test")
+@router.post("/push/test", response_model=schemas.PushTest,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 async def push_test(trip_id: str):
     """Fire the real check-and-send path now, so judges need not wait for 20:00.
 

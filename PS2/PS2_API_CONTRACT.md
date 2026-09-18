@@ -404,6 +404,8 @@ worth saying in one line.
 
 ### `GET /api/scenario` · `POST /api/scenario`
 
+Both return the same body:
+
 ```json
 { "enabled": true,
   "scenarios": { "lift_outage_outram": true, "ewl_disruption": false },
@@ -413,6 +415,31 @@ worth saying in one line.
 Default **off**. Used by the demo, and available to judges who want to see the disruption path
 on demand. It never changes whether `source`/`simulated_note` appear — those are always present
 and always honest.
+
+**The POST body** accepts either shape, and every field is optional — send only what you
+are changing:
+
+```json
+{ "scenarios": { "lift_outage_outram": true } }      // nested, as GET returns it
+{ "lift_outage_outram": true }                        // flat
+```
+
+So the natural round-trip works: `GET`, flip a flag, `POST` the whole body back. `note` is
+accepted and ignored so that round-trip needs no editing.
+
+| Field | Effect |
+|---|---|
+| `enabled` | The master switch. Setting it `false` silences every scenario while remembering which were armed, so the demo can be paused and resumed. An explicit value always wins. |
+| `scenarios.lift_outage_outram` | Appends the simulated Outram Park Exit 6 outage, labelled, beside the live rows. |
+| `scenarios.ewl_disruption` | Replaces `TrainServiceAlerts` with the Annex C replay. |
+
+Arming any scenario sets `enabled` to `true` on its own, so a screen need not send both.
+Turning one off does **not** clear the master switch.
+
+**Unknown fields are a `422`, not a silent success.** `{"lift_outage": true}` — the real key is
+`lift_outage_outram` — is rejected and names the field. Until this was fixed, both a mistyped key
+and the documented nested shape returned `200` and changed nothing, which is indistinguishable
+from a working call until someone notices the demo never arms.
 
 ---
 
@@ -432,6 +459,10 @@ is actually rendered:
 - [ ] `step_free: "unknown"` is worded as unknown, never as inaccessible
 - [ ] `offline_notice` appears whenever the cached bundle is used
 - [ ] `checks.label` shown near any warning, so "we detect, not predict" is visible
+- [ ] Response types **generated from `/openapi.json`**, not hand-written from this document
+- [ ] `lift_alerts[].blocked_exit_refs` is what decides which doors to avoid — never `exit_code`, which is only the first of them
+- [ ] `replan_failed` has its own state on screen; it is not `rerouted`, it means no step-free route could be built at all
+- [ ] A `422` from `POST /api/scenario` is surfaced, not swallowed — it means the demo did not arm
 
 
 ---
@@ -527,11 +558,26 @@ finding IDs are those of the review on PR #1.
   boards at 09:32, where it is 2.5.) The `access` block in §3.1 (`lift_id`,
   `status: "in_service"`) is illustrative and does not match what is served — see the two
   tables above.
-- **§8's scenario shapes are wrong.** The GET/POST response shape is shown nested under
-  `scenarios`, and the POST body is never documented; posting the nested shape returns 200
-  and changes nothing. Only the flat body works. `{"enabled": false}` also cannot switch the
-  demo off while a sub-scenario is still true.
 - **`sheltered_pct` is always emitted**, not "only when rain is forecast" as §3 says.
+
+### Prepared for the frontend
+
+Changes made before starting the UI, because they are cheaper now than once a screen depends
+on the current shapes.
+
+| Change | Why |
+|---|---|
+| **Every response is typed in `/openapi.json`.** All 16 endpoints had request models and no response models, so a screen could generate its request types and had to hand-write every response shape from the prose above — prose this very section exists to correct. Response types can now be generated. | The models live in `app/api/schemas.py` and were written from captured payloads, never from this document. |
+| `legs[]` and `alternatives.options[]` are **discriminated unions on `mode`**. Narrow on `mode` and the remaining fields are exactly right: a walk leg has no `line`, `access` or `headway_min`; a taxi option has no `arrival_at`. | A single model with everything optional would have hung `null`s on both. |
+| **§8's POST body is documented and both shapes work**, unknown fields are `422`, and `{"enabled": false}` switches the demo off. | See §8. The nested shape it documented used to return `200` and change nothing. |
+
+The models add nothing and remove nothing: they carry `extra="allow"` and every route sets
+`response_model_exclude_unset=True`, so a field a model does not yet know about still reaches
+the client, and an optional field a code path does not set stays absent rather than appearing
+as `null`. `tests/data/api_surface.json` records all 737 key paths the API served before the
+models existed, across both the armed and quiet demo states, and
+`tests/test_response_models.py` asserts they are all still served. Regenerate that file when an
+endpoint legitimately changes shape — the diff is then the API change, reviewable on its own.
 
 ### Behaviour worth knowing
 
