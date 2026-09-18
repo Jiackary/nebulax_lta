@@ -68,7 +68,7 @@ async def _validation_error(request: Request, exc: RequestValidationError):
                   "retryable": False}})
 
 
-from .api import alternatives, offline, push, status, trips  # noqa: E402
+from .api import alternatives, offline, push, schemas, status, trips  # noqa: E402
 
 app.include_router(trips.router, prefix="/api")
 app.include_router(status.router, prefix="/api")
@@ -77,7 +77,8 @@ app.include_router(push.router, prefix="/api")
 app.include_router(offline.router, prefix="/api")
 
 
-@app.get("/api/health")
+@app.get("/api/health", response_model=schemas.Health,
+         response_model_exclude_unset=True)
 def health():
     wg = data.walk_graph()
     return {
@@ -92,7 +93,8 @@ def health():
     }
 
 
-@app.get("/api/attribution")
+@app.get("/api/attribution", response_model=schemas.Attribution,
+         response_model_exclude_unset=True)
 def attribution():
     """Required wherever the map or anything derived from it is shown.
 

@@ -17,6 +17,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 
 from .. import store
+from . import schemas
 from ..config import SGT
 from .status import build_status
 
@@ -34,7 +35,9 @@ def steps_plain(plan: dict) -> list[str]:
     return out
 
 
-@router.get("/trips/{trip_id}/offline")
+@router.get("/trips/{trip_id}/offline", response_model=schemas.OfflineBundle,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 async def offline_bundle(trip_id: str):
     trip = store.get_trip(trip_id)
     if not trip:

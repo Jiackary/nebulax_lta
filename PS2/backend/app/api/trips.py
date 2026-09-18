@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, conlist, field_validator
 
 from .. import data, store
+from . import schemas
 from ..config import ATTRIBUTION, HOME_DEFAULT, SGT, SGH, USE_FIXTURES
 from ..services import planner, timing
 from ..sources import onemap
@@ -102,7 +103,9 @@ def build_plan(origin: dict, appointment: datetime, prefs: dict) -> tuple[dict, 
     return effective, baseline
 
 
-@router.post("/trips")
+@router.post("/trips", response_model=schemas.TripPlan,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def create_trip(req: TripRequest):
     if req.destination_id != "SGH":
         raise _err("INVALID_REQUEST",
@@ -117,7 +120,9 @@ def create_trip(req: TripRequest):
     return {"trip_id": trip_id, **plan}
 
 
-@router.get("/trips/{trip_id}")
+@router.get("/trips/{trip_id}", response_model=schemas.TripPlan,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def get_trip(trip_id: str):
     trip = store.get_trip(trip_id)
     if not trip:
@@ -125,7 +130,9 @@ def get_trip(trip_id: str):
     return {"trip_id": trip_id, **trip["plan"]}
 
 
-@router.delete("/trips/{trip_id}")
+@router.delete("/trips/{trip_id}", response_model=schemas.DeletedTrip,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def delete_trip(trip_id: str):
     if not store.delete_trip(trip_id):
         raise _err("TRIP_NOT_FOUND", "That trip no longer exists.", status=404)
@@ -133,7 +140,9 @@ def delete_trip(trip_id: str):
             "note": "The trip and its server copy are gone."}
 
 
-@router.get("/places/search")
+@router.get("/places/search", response_model=schemas.PlaceSearch,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 async def places_search(q: str):
     """Address autocomplete, via OneMap (I9).
 
@@ -159,7 +168,9 @@ async def places_search(q: str):
                    status=503, retryable=True)
 
 
-@router.get("/destinations")
+@router.get("/destinations", response_model=schemas.Destinations,
+             response_model_exclude_unset=True,
+             responses=schemas.ERROR_RESPONSES)
 def destinations():
     return {"destinations": [{"id": "SGH", "label": SGH["label"], "block": SGH["block"],
                               "coord": SGH["coord"]}]}
