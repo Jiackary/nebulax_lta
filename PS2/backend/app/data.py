@@ -12,7 +12,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from .config import DERIVED
+from .config import DERIVED, HANDCHECKED
 
 
 def _load(name: str):
@@ -50,6 +50,21 @@ def headways() -> dict:
 @lru_cache(maxsize=1)
 def bus_options() -> dict:
     return _load("bus_options.json")
+
+
+@lru_cache(maxsize=1)
+def public_holidays() -> frozenset[str]:
+    """ISO dates that run the `sunday_ph` timetable (F27).
+
+    Hand-entered rather than derived — `build_data.py` reads the GTFS
+    `service_id` prefix and never `calendar_dates.txt`, so no committed artefact
+    knows the dates. Absent file means an empty set, which is the old behaviour:
+    every weekday uses the weekday table.
+    """
+    path = HANDCHECKED / "public_holidays.json"
+    if not path.exists():
+        return frozenset()
+    return frozenset(h["date"] for h in json.loads(path.read_text())["holidays"])
 
 
 @lru_cache(maxsize=1)

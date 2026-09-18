@@ -56,6 +56,28 @@ not ride time. The honest range is `ride 30.7 fixed + wait 0–headway + walk at
 This is still fully defensible and still satisfies `PS2_README.md:L248` — but D8's stated basis
 must change or the write-up will claim something the data does not support.
 
+**Three corrections from the PR #1 review (F27),** all in `timing.py`:
+
+1. The headway must be read at the hour she **boards**, not the hour of her appointment. The
+   journey is about 55 min, so those are usually different hours: an 08:40 appointment boards
+   around 07:39, where the headway is 5.0 and not 2.5. Looking up the appointment hour
+   under-stated the slow end by 2.5 min, which is exactly the number D8 says makes the
+   uncertainty visible.
+2. **The nearest-hour fallback had to go.** The hourly buckets are built from measured
+   departure gaps, so an hour absent from a table is an hour nothing departed in. Answering a
+   03:00 query with the 01:00 figure made the planner promise "a train every 5 min" on a line
+   that shuts around midnight, and a 01:30 appointment got a plan reading "leave 00:20".
+   `headway_min` now returns `None` for such an hour and `has_service()` tells "no trains then"
+   apart from "no table for this stop"; the planner refuses rather than inventing a train.
+3. Public holidays run the `sunday_ph` table, not the weekday one. That mapping cannot be
+   derived here — `build_data.py` keys headways off the GTFS `service_id` prefix and never
+   reads `calendar_dates.txt` — so `data/handchecked/public_holidays.json` carries the dates
+   by hand, with their basis and a note that the lunar ones need confirming against the MOM
+   gazette. Erring toward including a date is the safe direction: a `sunday_ph` headway is the
+   larger one, so a wrong inclusion over-estimates her wait.
+
+Covered by `tests/test_timetable_hours.py`.
+
 ### I2 — D8's condition is resolved: GTFS works · ~~firm up~~ **RESOLVED**
 
 D8 is written conditionally ("if it returns usable data with our key") and time-boxed to an hour.
@@ -208,6 +230,15 @@ planner must snap only to nodes in the area's main component. Verified after the
 Bedok Exit B is 1,351 m unrestricted with one staircase, **1,364 m step-free with none — a 13 m
 detour** — and Outram Exit 4 → SGH is 795 m, 66% sheltered, step-free either way.
 
+**Half of this was still open until the PR #1 review (F17).** That `components` map is computed
+on the graph *with* staircases, so it is the wrong partition for a step-free snap: take the
+stairs out and Bedok's one main component is really 105 pieces (12,077 nodes, then 235, 77, …).
+An origin could snap to the nearest node of a 47-node island and be told "no step-free walking
+route to a usable entrance" while standing 42 m from network that reaches a door. `candidates()`
+in `app/data.py` now recomputes the components on the step-free graph and offers only the
+largest. On a 25×25 grid of origins over the Bedok bbox: 582 → **611** routed, 30 → **0**
+refused as unroutable. Covered by `tests/test_stepfree_snapping.py`.
+
 ### I4 — The GTFS response field is `link`, not `Link` · ~~parser trap~~ **CLOSED**
 
 Guide v6.9 p.56 documents the attribute as `Link`. The live response returns lowercase `link`,
@@ -306,7 +337,7 @@ backend/
 │   └── store.py             # SQLite: trips, push subs, retention (§8 commitment 1)
 ├── data/
 │   ├── derived/             # build-pipeline outputs, committed
-│   └── handchecked/         # EW5 + EW16 lift↔exit table (D7)
+│   └── handchecked/         # EW5 + EW16 lift↔exit table (D7), public holidays (F27)
 ├── scripts/
 │   ├── build_data.py        # the build-time pipeline (§5)
 │   └── verify_stepfree.py   # D11 claim script

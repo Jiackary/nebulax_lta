@@ -1,0 +1,35 @@
+{
+  "purpose": "Dates that run the sunday_ph train timetable instead of the weekday one (F27).",
+  "provenance": [
+    "Hand-entered from Singapore's gazetted public holidays. This is NOT derived from a feed and has not been checked against a primary source in this repo.",
+    "It cannot be derived here: scripts/build_data.py keys headways off the GTFS service_id prefix (SERVICE_WEEKDAY / SATURDAY / SUNDAY_PH) and never reads calendar_dates.txt, so nothing in the committed data knows which Tuesday is Deepavali. If calendar_dates.txt is ever shipped, rebuild this from it and drop the hand entry.",
+    "Before relying on this for a real journey, confirm every 'lunar' row against the Ministry of Manpower gazette."
+  ],
+  "erring_direction": [
+    "A sunday_ph headway is larger than the weekday one at the same hour (4.0-5.4 min against 2.5 at Bedok).",
+    "So a date wrongly included over-estimates her wait, and a date wrongly left out under-estimates it. When in doubt, include: the plan should be early, not late."
+  ],
+  "basis_key": {
+    "fixed": "the same calendar date every year",
+    "computed": "follows a rule (Good Friday is two days before Easter Sunday)",
+    "lunar": "set by a lunar or Islamic calendar - confirm against the gazette",
+    "in_lieu": "the Monday given when the holiday itself fell on a Sunday"
+  },
+  "years_covered": [2026],
+  "holidays": [
+    {"date": "2026-01-01", "name": "New Year's Day", "basis": "fixed"},
+    {"date": "2026-02-17", "name": "Chinese New Year", "basis": "lunar"},
+    {"date": "2026-02-18", "name": "Chinese New Year (second day)", "basis": "lunar"},
+    {"date": "2026-03-20", "name": "Hari Raya Puasa", "basis": "lunar"},
+    {"date": "2026-04-03", "name": "Good Friday", "basis": "computed"},
+    {"date": "2026-05-01", "name": "Labour Day", "basis": "fixed"},
+    {"date": "2026-05-27", "name": "Hari Raya Haji", "basis": "lunar"},
+    {"date": "2026-05-31", "name": "Vesak Day", "basis": "lunar"},
+    {"date": "2026-06-01", "name": "Vesak Day (in lieu)", "basis": "in_lieu"},
+    {"date": "2026-08-09", "name": "National Day", "basis": "fixed"},
+    {"date": "2026-08-10", "name": "National Day (in lieu)", "basis": "in_lieu"},
+    {"date": "2026-11-08", "name": "Deepavali", "basis": "lunar"},
+    {"date": "2026-11-09", "name": "Deepavali (in lieu)", "basis": "in_lieu"},
+    {"date": "2026-12-25", "name": "Christmas Day", "basis": "fixed"}
+  ]
+}

@@ -43,19 +43,49 @@ def walk_range(distance_m: float, pace: str) -> Range:
     return Range(distance_m / fast / 60, distance_m / nominal / 60, distance_m / slow / 60)
 
 
-def headway_min(route: str, stop_code: str, direction: str, when: datetime) -> float | None:
+def daytype_of(when: datetime) -> str:
+    """Which of the three timetables applies.
+
+    A public holiday runs the Sunday service whatever weekday it lands on, so
+    the weekday map alone put her on 2.5 min headways on Christmas Day (F27).
+    """
+    if when.date().isoformat() in data.public_holidays():
+        return "sunday_ph"
+    return DAYTYPE_OF_WEEKDAY[when.weekday()]
+
+
+def _hours(route: str, stop_code: str, direction: str, when: datetime) -> dict:
     table = data.headways().get(route, {}).get(stop_code, {})
-    daytype = DAYTYPE_OF_WEEKDAY[when.weekday()]
-    hours = table.get(daytype, {}).get(direction, {})
+    return table.get(daytype_of(when), {}).get(direction, {})
+
+
+def headway_min(route: str, stop_code: str, direction: str, when: datetime) -> float | None:
+    """Measured median gap between departures, in the hour `when` falls in.
+
+    `None` means we have no measurement for that hour. There is deliberately no
+    nearest-hour fallback any more: it answered a 03:00 query with the 01:00
+    figure, which had the planner promise "a train every 5 min at this hour" on
+    a line that shuts around midnight (F27). Use `has_service` to tell "no
+    trains then" apart from "no table for this stop at all".
+    """
+    hours = _hours(route, stop_code, direction, when)
+    return hours.get(str(when.hour)) if hours else None
+
+
+def has_service(route: str, stop_code: str, direction: str,
+                when: datetime) -> bool | None:
+    """Does anything depart in that hour? `None` when we have no table to say.
+
+    The hourly buckets are built from real departure gaps, so an hour missing
+    from a table that has other hours is an hour nothing departed in — before
+    the first train, after the last, or between the peaks of a peak-only
+    shuttle. Treating that as "unknown headway, assume 5 min" is how a 01:30
+    appointment got a plan.
+    """
+    hours = _hours(route, stop_code, direction, when)
     if not hours:
         return None
-    hour = str(when.hour)
-    if hour in hours:
-        return hours[hour]
-    # nearest hour we have, rather than inventing one
-    known = sorted(int(h) for h in hours)
-    nearest = min(known, key=lambda h: abs(h - when.hour))
-    return hours[str(nearest)]
+    return str(when.hour) in hours
 
 
 def wait_range(headway: float | None) -> Range:
@@ -104,6 +134,9 @@ def basis_sentence(ride: float | None, spread: float | None, headway: float | No
         else:
             bits.append(f"Train ride is a scheduled {ride:.0f} min")
     if headway:
-        bits.append(f"a train every {headway:g} min at this hour, so 0–{headway:g} min of waiting")
+        # "when she boards", not "at this hour": the figure is looked up at the
+        # hour she reaches the platform, which is rarely the appointment's (F27).
+        bits.append(f"a train every {headway:g} min when she boards, "
+                    f"so 0–{headway:g} min of waiting")
     bits.append(f"{walk_m:.0f} m of walking at an assumed {nominal} m/s")
     return ". ".join(b[0].upper() + b[1:] for b in bits) + "."
