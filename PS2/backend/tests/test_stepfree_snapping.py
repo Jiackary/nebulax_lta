@@ -46,6 +46,23 @@ def test_bedok_step_free_candidates_are_the_largest_piece(wg):
     assert len(wg.candidates("bedok", True)) == 12077
 
 
+@pytest.mark.parametrize("area", ["bedok", "outram"])
+def test_every_entrance_is_on_the_piece_we_kept(wg, area):
+    """The assumption the fix rests on, stated out loud.
+
+    Keeping "the largest piece" is only right because that is the piece the
+    station doors are on. If a rebuild ever split the graph so that the biggest
+    component held no entrances, routing would fail for everyone and every other
+    test here would still pass, so assert it directly rather than by implication.
+    """
+    keep = set(wg.candidates(area, True))
+
+    for ent in (e for e in wg.entrances if e["area"] == area):
+        node, snapped = walking._snap(wg, ent["coord"], area, True)
+        assert node in keep, f"{area} entrance {ent['ref']} is off the kept piece"
+        assert snapped < 50, f"{area} entrance {ent['ref']} snapped {snapped:.0f} m"
+
+
 def test_an_origin_beside_the_network_gets_a_route(wg):
     """Before the fix this raised "no step-free walking route to a usable entrance"."""
     plan = planner.plan_trip({"label": "Home", "coord": STRANDED}, APPOINTMENT)
