@@ -9,6 +9,7 @@ import { getActiveTripId } from './features/planning/activeTrip'
 import { SettingsPage } from './features/settings/SettingsPage'
 import './styles/global.css'
 import './styles/native.css'
+import './styles/feedback.css'
 
 function PageShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
