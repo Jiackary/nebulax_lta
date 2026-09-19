@@ -13,7 +13,7 @@ export function JourneyTimeline({ plan }: { plan: TripPlan }) {
         <li key={leg.leg_id} className="journey-leg">
           <span className="journey-marker" aria-hidden="true">{index + 1}</span>
           <div className="journey-step">
-            <p className="journey-mode">{leg.mode === 'rail' ? leg.line.name : 'Walk'}</p>
+            <p className="journey-mode"><span className={`mode-dot mode-${leg.mode}`} aria-hidden="true" />{leg.mode === 'rail' ? leg.line.name : 'Walk'}</p>
             <h3>{leg.instruction}</h3>
             <p className="journey-detail">
               {leg.duration_min === null ? 'Travel time not available' : `About ${leg.duration_min} minutes`}
