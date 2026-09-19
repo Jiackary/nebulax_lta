@@ -14,6 +14,7 @@ body {
 button, input, select, textarea { font: inherit; }
 a { color: inherit; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.app-shell main:focus { outline: none; }
 .app-shell { width: min(100%, 1120px); margin: 0 auto; padding: 24px 20px 56px; }
 .site-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: clamp(38px, 10vw, 72px); }
 .site-header p { margin: 0; color: var(--muted); font-size: 0.875rem; }

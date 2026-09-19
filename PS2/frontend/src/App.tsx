@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { BrowserRouter, Link, Route, Routes, useParams, useLocation } from 'react-router-dom'
 
 import { AlternativesPage } from './features/alternatives/AlternativesPage'
@@ -13,7 +14,12 @@ import './styles/feedback.css'
 
 function PageShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
   const parent = pathname.endsWith('/options') ? pathname.replace(/\/options$/, '') : '/'
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+    mainRef.current?.focus({ preventScroll: true })
+  }, [pathname])
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -24,7 +30,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
         </Link>
         {pathname !== '/settings' && <Link className="header-control settings-control" to="/settings" aria-label="Journey settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="3" fill="currentColor" stroke="none"/></svg></Link>}
       </header>
-      <main>{children}</main>
+      <main ref={mainRef} tabIndex={-1}>{children}</main>
     </div>
   )
 }

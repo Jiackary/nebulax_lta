@@ -20,4 +20,11 @@ describe('application shell', () => {
     expect(screen.getByRole('heading', { name: /page not found/i })).toBeVisible()
     expect(screen.getByRole('link', { name: /go home/i })).toHaveAttribute('href', '/')
   })
+
+  it('moves focus to the new page landmark after route navigation', () => {
+    window.history.replaceState({}, '', '/plan')
+    render(<App />)
+
+    expect(document.activeElement).toBe(screen.getByRole('main'))
+  })
 })
