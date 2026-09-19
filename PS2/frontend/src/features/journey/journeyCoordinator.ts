@@ -135,6 +135,14 @@ export class JourneyCoordinator {
     }
   }
 
+  // A check that succeeded ten minutes ago is not a current check. Without this the panel
+  // keeps saying "Checked 09:14" in the present tense for as long as the screen is open.
+  markStale() {
+    const snapshot = this.state.snapshot
+    if (!snapshot || snapshot.statusFreshness !== 'current') return
+    this.publish({ ...this.state, snapshot: { ...snapshot, statusFreshness: 'stale' } })
+  }
+
   private async refreshCurrent() {
     const tripId = this.tripId
     const generation = this.generation
