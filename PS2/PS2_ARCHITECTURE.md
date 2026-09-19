@@ -1,26 +1,27 @@
 # PS2 — Current architecture
 
-Reviewed against `main` at `8f87265`, 18 September 2026. This describes implemented
-code, with future browser capabilities explicitly separated below.
+Backend reviewed against `main` at `8f87265`; frontend updated on `codex/frontend` at
+`535bdab`, 19 September 2026. This describes implemented code, with unfinished
+browser capabilities explicitly separated below.
 
 ## Presentation overview
 
 The Smart Commuter Companion helps Mdm Lim plan a step-free trip from Bedok to
 Singapore General Hospital. A Python backend combines a prepared walking network
 and rail timetable with current transport reports, stores her journey, and exposes
-typed APIs for a mobile web client. Scheduled checks can send warnings before travel.
+typed APIs consumed by a mobile-first React web client. Scheduled checks can send
+warnings before travel.
 
 The architecture has three parts: a build-time data preparation pipeline, a FastAPI
-application with local storage, and external data/push services. The frontend is
-still planned; there is no implemented mobile interface or speech feature yet.
+application with local storage, and external data/push services. The frontend
+now includes a functional first-slice mobile interface. Speech is not implemented.
 
 ```mermaid
 flowchart TB
     BuildSources["Build inputs: LTA GTFS and geospatial data; OSM Overpass"]
     Build["scripts/build_data.py"]
     Derived[("Committed JSON / GeoJSON reference data")]
-    Client["API consumer today: docs, scripts, tests"]
-    Future["Planned React / Vite mobile PWA"]
+    Client["React / Vite mobile PWA"]
     subgraph Backend["FastAPI application process"]
         API["Typed REST endpoints and error responses"]
         Services["Planning, lift matching, disruption assessment and alternatives"]
@@ -36,7 +37,6 @@ flowchart TB
     PushProvider["Browser push service"]
     BuildSources --> Build --> Derived --> Memory
     Client --> API
-    Future -.-> API
     API --> Services
     API --> DB
     Services --> Memory
@@ -52,7 +52,7 @@ flowchart TB
     Jobs --> Push
     API --> Push
     Push --> PushProvider
-    PushProvider -. "Browser subscription required" .-> Future
+    PushProvider -. "Browser subscription required" .-> Client
 ```
 
 All boxes inside the application process are Python modules, not independently
@@ -69,7 +69,7 @@ established by this diagram. External retrieval uses HTTP; public API payloads a
 | Upstream memory | Latest response per configured source | `app/sources/base.py`; TTL cache and fetch lock within each process |
 | Recorded fixtures | Captured upstream payloads with capture times | `backend/data/fixtures/`; fallback; updates require `PS2_RECORD_FIXTURES` |
 | SQLite | Trip origin, preferences, appointment, original/effective plans; push subscriptions; delivery claims | `app/store.py`; default `backend/data/ps2.sqlite3`, configurable with `PS2_DB` |
-| Browser storage | Intended saved offline bundle and app shell | Planned frontend responsibility; not implemented |
+| Browser storage | Saved offline bundle and app shell | IndexedDB and service-worker implementation exists; cold deep-link recovery remains incomplete |
 
 Configured source TTLs: bus arrivals 20 seconds; lifts and train alerts 60 seconds;
 weather 300 seconds; crowding 600 seconds; taxi stands 24 hours. Expiry triggers no
@@ -161,8 +161,10 @@ Do not present this as an already-designed distributed deployment.
 
 ## Current boundaries to state during a presentation
 
-- Frontend, service worker, map UI, and read-aloud controls are planned. The backend
-  has typed Pydantic response schemas in `app/api/schemas.py` and serves OpenAPI.
+- The mobile frontend and service worker are implemented as a first slice. Offline
+  deep-link recovery, route visualisation, production push lifecycle, and read-aloud
+  controls remain unfinished. The backend has typed Pydantic response schemas in
+  `app/api/schemas.py` and serves OpenAPI.
 - Data freshness and provenance are separate: a recorded real response can have
   `source: live` while also being stale. Demo injection is labelled simulated.
 - `PS2_USE_FIXTURES` is not a universal network firewall: the generic source adapter
@@ -193,4 +195,5 @@ Suggested 45-second explanation:
 > and user-triggered read-aloud guidance.
 
 Related: [API contract](PS2_API_CONTRACT.md), [backend plan](PS2_BACKEND_PLAN.md),
-[frontend planning backlog](PS2_FRONTEND_PLAN.md), [decision record](PS2_DECISION_RECORD.md).
+[frontend planning backlog](PS2_FRONTEND_PLAN.md), [decision record](PS2_DECISION_RECORD.md),
+and [consolidated completion roadmap](PS2_CONSOLIDATED_ROADMAP.md).
