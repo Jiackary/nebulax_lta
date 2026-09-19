@@ -10,6 +10,11 @@ What it serves: [`../PS2_API_CONTRACT.md`](../PS2_API_CONTRACT.md) — and `/doc
 
 ## Prerequisites
 
+Architecture and presentation overview: [PS2_ARCHITECTURE.md](../PS2_ARCHITECTURE.md).
+Core frontend implementation plan: [PS2_FRONTEND_PLAN.md](../PS2_FRONTEND_PLAN.md).
+Separate read-aloud handoff: [PS2_READ_ALOUD_HANDOFF.md](../PS2_READ_ALOUD_HANDOFF.md).
+Consolidated product and routing roadmap: [PS2_CONSOLIDATED_ROADMAP.md](../PS2_CONSOLIDATED_ROADMAP.md).
+
 - Python 3.11+
 - A free LTA DataMall `AccountKey` — register at <https://datamall.lta.gov.sg>
 - A free OneMap API token — register at <https://www.onemap.gov.sg/apidocs/>
