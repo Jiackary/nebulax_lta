@@ -16,11 +16,7 @@ function HomePage() {
   const tripId = getActiveTripId()
   return (
     <PageShell>
-      <section aria-labelledby="home-heading">
-        <p className="eyebrow">Your day, at your pace</p>
-        <h1 id="home-heading">Your journey</h1>
-        <p className="home-intro">A little preparation. A calmer trip.</p>
-      </section>
+      <h1 id="home-heading">Your journey</h1>
       <section className="route-ticket" aria-label="Your usual route">
         <div className="ticket-top"><span>Your usual route</span><span className="route-chip">Hospital visit</span></div>
         <div className="route-endpoints">

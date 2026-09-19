@@ -26,13 +26,13 @@ export default defineConfig({
       // stays pending, and push reminders cannot be exercised outside a preview build.
       devOptions: { enabled: true, type: 'module', navigateFallback: 'index.html' },
       manifest: {
-        name: 'Nusa Journey Companion',
-        short_name: 'Nusa',
+        name: 'Wobble Journey Companion',
+        short_name: 'Wobble',
         description: 'Journey guidance for hospital appointments.',
-        theme_color: '#145a42',
-        background_color: '#f6f7f4',
+        theme_color: '#0d6048',
+        background_color: '#f4f5f0',
         display: 'standalone',
-        icons: [{ src: '/icons/nusa.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [{ src: '/icons/wobble.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
     }),
   ],

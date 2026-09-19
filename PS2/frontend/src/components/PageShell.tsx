@@ -33,9 +33,11 @@ export function PageShell({ title, back, wide = false, children }: {
             </Link>
           )
           : (
-            <Link className="wordmark" to="/" aria-label="Nusa journey home">
-              <span aria-hidden="true">N</span>
-              Nusa
+            <Link className="wordmark" to="/" aria-label="Wobble journey home">
+              <span aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 128 128" fill="none" stroke="currentColor" strokeWidth="19" strokeLinecap="round" aria-hidden="true"><path d="M22 64q21-42 42 0t42 0" /></svg>
+              </span>
+              Wobble
             </Link>
           )}
         <p className="header-title">{title ?? ''}</p>

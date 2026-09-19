@@ -21,7 +21,7 @@ self.addEventListener('push', (event) => {
   const payload = event.data?.json() as { title?: string; body?: string; url?: string } | undefined
   const url = payload?.url?.startsWith('/trip/') ? payload.url : '/'
   event.waitUntil(self.registration.showNotification(payload?.title ?? 'Journey update', {
-    body: payload?.body ?? 'Open Nusa to check your journey.',
+    body: payload?.body ?? 'Open Wobble to check your journey.',
     data: { url },
   }))
 })
