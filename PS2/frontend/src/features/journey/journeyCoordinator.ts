@@ -117,7 +117,7 @@ export class JourneyCoordinator {
         phase: status?.replan_failed || plan.replan_failed ? 'degraded' : 'ready', operation: 'idle',
         snapshot: {
           tripId, plan, status, receivedAt: bundle.generated_at, source: 'network',
-          routeConfirmed: Boolean(status) && !status.replan_failed && !plan.replan_failed,
+          routeConfirmed: status !== null && !status.replan_failed && !plan.replan_failed,
           statusFreshness: status ? (status.stale ? 'stale' : 'current') : 'unavailable',
           warnings: bundle.warnings,
         },
