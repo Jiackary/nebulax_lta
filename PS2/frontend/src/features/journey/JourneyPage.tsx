@@ -47,7 +47,10 @@ export function JourneyPage({ tripId }: { tripId: string }) {
         </section>
         <div className="journey-notices">
           {snapshot.source === 'saved' && <p className="offline-notice">Offline copy · saved {formatSingaporeDateTime(snapshot.receivedAt)}{snapshot.generatedAt ? ` · plan generated ${formatSingaporeDateTime(snapshot.generatedAt)}` : ''}</p>}
-          {message && <p className="form-error" role="alert">{message}</p>}
+          {/* Red is reserved for something being wrong with the journey. Reading the saved
+              copy with no network is the case this feature exists for, and the notice above
+              already says so, so the message that comes with it is a caution, not an alarm. */}
+          {message && <p className={snapshot.source === 'saved' ? 'journey-warning' : 'form-error'} role="alert">{message}</p>}
           <AsyncFeedback operation={operation} label={operation === 'loading-effective-plan' ? 'Updating your directions…' : operation === 'preparing-offline' ? 'Preparing offline steps…' : 'Checking current conditions…'} />
         </div>
         <StatusPanel
