@@ -18,13 +18,17 @@ export function SettingsPage({ tripId }: { tripId: string | null }) {
   async function removeTrip() {
     if (!tripId || deleting) return
     setDeleting(true)
+    let serverDeleted = false
     try {
       await deleteTrip(tripId)
+      serverDeleted = true
       clearActiveTripId()
       await clearOfflineBundle(tripId)
       navigate('/')
     } catch (reason) {
-      setMessage(reason instanceof ApiError ? reason.message : 'We could not delete the server journey.')
+      setMessage(serverDeleted
+        ? 'The server journey was deleted, but the saved copy on this device could not be removed.'
+        : reason instanceof ApiError ? reason.message : 'We could not delete the server journey.')
       setConfirming(false)
     } finally {
       setDeleting(false)

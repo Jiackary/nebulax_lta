@@ -17,12 +17,12 @@ function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <header className="site-header">
-        {pathname !== '/' && <Link className="header-control" to={parent} aria-label="Back">←</Link>}
+        {pathname !== '/' && <Link className="header-control" to={parent} aria-label="Back to previous screen">←</Link>}
         <Link className="wordmark" to="/" aria-label="Nusa journey home">
           <span aria-hidden="true">N</span>
           Nusa
         </Link>
-        <Link className="header-control settings-control" to="/settings" aria-label="Journey settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="3" fill="currentColor" stroke="none"/></svg></Link>
+        {pathname !== '/settings' && <Link className="header-control settings-control" to="/settings" aria-label="Journey settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="3" fill="currentColor" stroke="none"/></svg></Link>}
       </header>
       <main>{children}</main>
     </div>

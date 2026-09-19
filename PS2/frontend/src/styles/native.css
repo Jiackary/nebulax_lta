@@ -62,6 +62,7 @@ h2 { letter-spacing: -.4px; line-height: 1.25; }
 .journey-arrival { font-size: 18px; }
 .journey-basis { font-size: 16px; }
 .status-panel, .timeline-panel, .option-card, .settings-card { border-radius: 20px; padding: 20px; box-shadow: none; }
+.option-skeleton { display: grid; gap: 12px; min-height: 164px; }
 .status-panel h2 { font-size: 19px; }
 .status-panel p { font-size: 16px; }
 .status-panel .status-kicker { font-size: 13px; }

@@ -34,7 +34,7 @@ export function JourneyPage({ tripId }: { tripId: string }) {
         <div className="section-heading"><div><p className="eyebrow">Your route</p><h2 id="steps-heading">Journey steps</h2></div><Link className="text-button" to={`/trip/${encodeURIComponent(tripId)}/options`}>See options</Link></div>
         <JourneyTimeline plan={plan} />
       </section>
-      <SaveOfflineButton tripId={tripId} />
+      <SaveOfflineButton />
       <Link className="text-button" to="/settings">Journey settings</Link>
       <footer className="attribution">{plan.attribution.map((item) => <span key={item}>{item}</span>)}</footer>
     </div>

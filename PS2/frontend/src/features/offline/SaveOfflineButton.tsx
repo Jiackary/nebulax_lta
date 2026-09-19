@@ -4,7 +4,7 @@ import { ApiError } from '../../api/client'
 import { saveOfflineBundle } from './storage'
 import { useJourney } from '../journey/useJourney'
 
-export function SaveOfflineButton({ tripId: _tripId }: { tripId: string }) {
+export function SaveOfflineButton() {
   const { prepareOffline } = useJourney()
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
@@ -16,7 +16,7 @@ export function SaveOfflineButton({ tripId: _tripId }: { tripId: string }) {
       const bundle = await prepareOffline()
       await saveOfflineBundle(bundle)
       setState('saved')
-      setMessage('Written journey saved on this device.')
+      setMessage(`Written journey saved at ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date())}.`)
     } catch (reason) {
       setState('error')
       setMessage(reason instanceof ApiError ? reason.message : 'We could not save written steps on this device.')

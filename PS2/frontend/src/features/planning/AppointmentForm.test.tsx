@@ -52,7 +52,7 @@ describe('appointment form', () => {
         preferences: { walking_pace: 'slow', avoid_stairs: true, prefer_sheltered: true, buffer_min: 15 },
       }),
     })
-    expect(screen.getByRole('heading', { name: /preparing your journey/i })).toBeVisible()
+    expect(screen.getByRole('heading', { name: /loading your saved route/i })).toBeVisible()
   })
 
   it('explains that the request is preparing a journey while submission is pending', async () => {
