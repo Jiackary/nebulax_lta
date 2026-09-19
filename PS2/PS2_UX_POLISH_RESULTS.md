@@ -18,6 +18,8 @@ Completed 19 September 2026 on branch `codex/frontend`.
 - Alternatives show option-shaped placeholders while loading. Offline saving reports
   the saved time; deletion distinguishes a server deletion from a failed local-copy
   removal. Settings no longer links to itself.
+- Route changes reset scroll position and move keyboard focus to the new page's main
+  landmark; background refreshes do neither.
 
 ## Validation
 
