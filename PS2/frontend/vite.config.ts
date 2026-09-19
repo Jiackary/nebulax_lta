@@ -11,6 +11,10 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'prompt',
+      // Production builds get a registration script injected automatically, but dev builds
+      // do not: without this the worker never installs on :5173, navigator.serviceWorker.ready
+      // stays pending, and push reminders cannot be exercised outside a preview build.
+      devOptions: { enabled: true, type: 'module', navigateFallback: 'index.html' },
       manifest: {
         name: 'Nusa Journey Companion',
         short_name: 'Nusa',

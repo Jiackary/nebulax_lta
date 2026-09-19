@@ -13,6 +13,23 @@ function supported() {
   return 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window
 }
 
+class ServiceWorkerUnavailableError extends Error {}
+
+const READY_TIMEOUT_MS = 5000
+
+// navigator.serviceWorker.ready never rejects: when no worker takes control it stays pending
+// forever, leaving the button stuck on 'Enabling reminders…'. Private windows, blocked site
+// storage and locked-down browsers all land there. Race it so the failure is reportable.
+function serviceWorkerReady() {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new ServiceWorkerUnavailableError()), READY_TIMEOUT_MS)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
 export function ReminderControls({ tripId }: { tripId: string }) {
   const [state, setState] = useState<'idle' | 'enabling' | 'enabled' | 'unavailable'>('idle')
   const [message, setMessage] = useState<string | null>(null)
@@ -26,7 +43,7 @@ export function ReminderControls({ tripId }: { tripId: string }) {
     setState('enabling')
     setMessage(null)
     try {
-      const registration = await navigator.serviceWorker.ready
+      const registration = await serviceWorkerReady()
       const { public_key } = await getPushKey()
       const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(public_key) })
       const json = subscription.toJSON()
@@ -36,7 +53,8 @@ export function ReminderControls({ tripId }: { tripId: string }) {
       setMessage('Journey reminders are enabled for this device.')
     } catch (reason) {
       setState('idle')
-      setMessage(reason instanceof ApiError ? reason.message : 'We could not enable reminders on this device.')
+      if (reason instanceof ServiceWorkerUnavailableError) setMessage('This browser did not start the background service reminders need. Close and reopen the app, then try again.')
+      else setMessage(reason instanceof ApiError ? reason.message : 'We could not enable reminders on this device.')
     }
   }
 
