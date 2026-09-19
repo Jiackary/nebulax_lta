@@ -26,7 +26,7 @@ async function regionBoxes(width: number, api: MockApiOptions, page: import('@pl
   await page.setViewportSize({ width, height: 1400 })
   await mockApi(page, api)
   await page.goto(TRIP)
-  await page.locator('.journey-hero').waitFor()
+  await page.locator('.departure-card').waitFor()
   await expect(page.getByRole('heading', { name: /journey steps/i })).toBeVisible()
   return page.evaluate(() => {
     const read = (selector: string) => {
@@ -53,10 +53,14 @@ test.describe('the journey regions hold their place at desktop width', () => {
       expect(boxes.overview, 'overview region is present').not.toBeNull()
       // The second column starts level with the first, whatever optional content exists.
       expect(boxes.overview!.y).toBe(boxes.summary!.y)
-      // Directions and actions stay full width below both columns.
+      // Directions continue the first column — same left edge, same measure — so the route
+      // map stays beside the steps it illustrates instead of leaving a tall empty band.
       expect(boxes.directions!.x).toBe(boxes.summary!.x)
-      expect(boxes.directions!.width).toBeGreaterThan(boxes.summary!.width)
+      expect(boxes.directions!.width).toBe(boxes.summary!.width)
+      expect(boxes.directions!.y).toBeGreaterThan(boxes.summary!.y)
+      // Actions run the full width underneath both columns.
       expect(boxes.actions!.y).toBeGreaterThan(boxes.directions!.y)
+      expect(boxes.actions!.width).toBeGreaterThan(boxes.summary!.width)
     })
   }
 

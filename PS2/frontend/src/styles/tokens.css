@@ -1,18 +1,93 @@
+/* Every token the interface uses, defined once. No other stylesheet declares a raw colour,
+   radius, shadow or spacing step — if a value is needed twice it belongs here. */
+
 :root {
-  color: #17251f;
-  background: #f6f7f4;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  --page: #f6f7f4;
+  /* Surface and ink. The canvas is a warm off-white so the one dark departure surface reads
+     as the brightest decision on the page rather than competing with white cards. */
+  --canvas: #f4f5f0;
   --surface: #ffffff;
-  --ink: #17251f;
-  --muted: #54635a;
-  --line: #dbe4dd;
-  --green: #145a42;
-  --green-dark: #0d3d2c;
-  --green-wash: #e8f1eb;
+  --surface-sunk: #e9ede5;
+  --ink: #12271f;
+  --ink-2: #536259;
+  --line: #dbe0d6;
+  --line-strong: #b4bfb2;
+
+  /* Brand. */
+  --forest: #0d6048;
+  --forest-deep: #0a3a2c;
+  --forest-wash: #e3eee7;
+  --on-forest: #f2f8f3;
+  --on-forest-2: #c5dccd;
+  /* Warm accent. Measured at ~2.1:1 on the canvas, so it fails WCAG AA as text and is
+     restricted to non-text emphasis: rules, keylines, the departure underline. */
+  --accent: #d8a35f;
+
+  /* Status. Each foreground is checked against its own wash and against the surface. */
+  --ok: #0d6048;
+  --info: #1d5a8c;
+  --warn: #7c4a04;
+  --warn-wash: #fdf3e2;
+  --critical: #a3271b;
+  --critical-wash: #fdf1ee;
+  /* The two colours the route map paints an affected leg with. The schematic reads the same
+     impact mapping, so it has to paint it the same way. */
+  --impact-warn: #b26a00;
+  --impact-critical: #b3261e;
   --focus: #165fdb;
-  --radius: 1rem;
-  --shadow: 0 14px 36px rgb(28 55 39 / 8%);
+
+  /* Spacing scale: 4 / 8 / 12 / 16 / 24 / 32 / 48, in rem so it enlarges with text. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-6: 1.5rem;
+  --s-8: 2rem;
+  --s-12: 3rem;
+
+  /* Page gutter: 16px at 320, 20px from 390. Widened again once a second column exists. */
+  --gutter: 1rem;
+
+  /* Reading measure and the width at which a second column is allowed to appear. */
+  --reading: 42rem;
+
+  /* Radius: controls 16px, primary surfaces 24px. One shadow tier, used sparingly. */
+  --radius-control: 1rem;
+  --radius-surface: 1.5rem;
+  --radius-pill: 999px;
+  --shadow: 0 0.75rem 2rem rgb(18 39 31 / 8%);
+
+  /* Minimum touch target. */
+  --target: 3rem;
+
+  /* Type. Manrope carries the departure time and headings; the body stays on the system
+     sans so it renders at the size the reader already trusts. */
+  --font-display: 'Manrope', var(--font-body);
+  --font-body: system-ui, -apple-system, 'Segoe UI', roboto, 'Helvetica Neue', sans-serif;
+  /* The departure clock is bounded by the viewport, not only by the root font. At 200% text
+     a rem-only floor put "09:22" at 112px — 290px of glyphs inside a 208px column — and the
+     page scrolled sideways. It is still the largest thing on the screen by a factor of four;
+     the rest of the page enlarges normally. */
+  --text-departure: min(4.5rem, 20vw);
+  --text-title: clamp(1.75rem, 6.5vw, 2rem);
+  --text-section: 1.375rem;
+  --text-step: 1.125rem;
+  --text-body: 1.125rem;
+  --text-support: 1rem;
+  --text-meta: 0.875rem;
+
+  /* Motion. Batch 4 implements the choreography; the durations live here now so the small
+     amount of feedback that already exists uses the same numbers. */
+  --enter: 240ms;
+  --exit: 140ms;
+  --press: 100ms;
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (min-width: 390px) {
+  :root { --gutter: 1.25rem; }
+}
+
+@media (min-width: 960px) {
+  :root { --gutter: 2rem; }
 }

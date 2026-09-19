@@ -9,9 +9,9 @@ function planPage() {
   return render(<App />)
 }
 
-// The form seeds its default appointment from the real clock, and AsyncFeedback starts a
-// five second timer on submit that outlives the test. Neither is the cause of any failure
-// seen so far, but both make these tests depend on when and how fast they are run.
+// AsyncFeedback starts a five second timer on submit that outlives the test, so the clock
+// is controlled here. The appointment field itself no longer has a default: it starts empty
+// and the reader has to choose a time, which is the behaviour the first test covers.
 function setup() {
   return userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
 }
@@ -33,10 +33,11 @@ describe('appointment form', () => {
     planPage()
 
     const appointment = screen.getByLabelText(/appointment date and time/i)
-    await user.clear(appointment)
+    expect(appointment).toHaveValue('')
+
     await user.click(screen.getByRole('button', { name: /plan journey/i }))
 
-    expect(screen.getByText(/choose an appointment date and time/i)).toBeVisible()
+    expect(screen.getByText(/choose the date and time of your appointment/i)).toBeVisible()
     expect(appointment).toBeVisible()
   })
 
@@ -75,6 +76,7 @@ describe('appointment form', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => undefined)))
     planPage()
 
+    fireEvent.change(screen.getByLabelText(/appointment date and time/i), { target: { value: '2026-10-20T09:00' } })
     await user.click(screen.getByRole('button', { name: /plan journey/i }))
 
     expect(screen.getByText(/preparing your journey/i)).toBeVisible()

@@ -1,0 +1,8 @@
+/* The single stylesheet entry. Cascade order is explicit here and nowhere else: tokens
+   define values, base styles bare elements, layout places regions, components paint them.
+   Every rule lives in exactly one of the four, so a component has one owner and no later
+   file quietly overrides an earlier one. */
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+@import './components.css';

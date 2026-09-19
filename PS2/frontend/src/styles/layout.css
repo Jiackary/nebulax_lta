@@ -1,0 +1,170 @@
+/* App shell, contextual header, page column and the journey's named regions.
+   Structure only: nothing here paints a component. */
+
+.app-shell {
+  display: grid;
+  width: 100%;
+  max-width: calc(var(--reading) + var(--gutter) * 2);
+  min-height: 100dvh;
+  align-content: start;
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr);
+  padding-inline: var(--gutter);
+  padding-block-end: max(var(--s-12), env(safe-area-inset-bottom));
+}
+
+/* Only the journey earns a second column, and only once both columns genuinely fit. */
+@media (min-width: 960px) {
+  .app-shell[data-layout='wide'] { max-width: 72rem; }
+}
+
+.site-header {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: grid;
+  align-items: center;
+  margin-inline: calc(var(--gutter) * -1);
+  gap: var(--s-2);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  padding-inline: var(--gutter);
+  padding-block: max(var(--s-2), env(safe-area-inset-top)) var(--s-2);
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+  margin-block-end: var(--s-6);
+}
+
+.site-header > :last-child { justify-self: end; }
+
+/* The page column. Every screen's content sits in one reading measure; the journey opts
+   out at the wide breakpoint because its two regions are the composition. */
+.page {
+  display: grid;
+  align-content: start;
+  gap: var(--s-6);
+  grid-template-columns: minmax(0, 1fr);
+  padding-block-end: var(--s-8);
+}
+
+/* Five named regions, each with its own grid area. Optional notices used to sit directly
+   in the layout grid and auto-place, so a failed status check pushed the route map down a
+   column it has nothing to do with. An empty region now collapses where it stands.
+   `display: contents` is deliberately avoided: the regions have to be real boxes for the
+   areas to mean anything. */
+.journey-layout {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'summary' 'overview' 'directions' 'actions';
+  padding-block-end: var(--s-8);
+}
+
+.journey-summary { grid-area: summary; }
+.journey-overview { grid-area: overview; }
+.journey-directions { grid-area: directions; }
+.journey-actions { grid-area: actions; }
+
+.journey-summary,
+.journey-overview,
+.journey-actions {
+  display: grid;
+  align-content: start;
+  gap: var(--s-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The notices region is a grid child that may legitimately be empty. Its gap must not
+   leave a band of space above the status panel when nothing has gone wrong. */
+.journey-notices {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.journey-notices:empty { display: none; }
+
+@media (min-width: 960px) {
+  .journey-layout {
+    align-items: start;
+    gap: var(--s-6);
+    grid-template-columns: minmax(0, 1.05fr) minmax(20rem, 0.95fr);
+    grid-template-areas: 'summary overview' 'directions overview' 'actions actions';
+  }
+
+  /* Directions keep a bounded reading column even when the shell is wide. */
+  .journey-directions { max-width: var(--reading); }
+
+  /* The overview column is shorter than the steps beside it, which left a tall band of
+     unexplained empty space. Sticking it turns that space into the map staying on screen
+     while she reads the steps it illustrates. */
+  .journey-overview {
+    position: sticky;
+    top: 5.5rem;
+    align-self: start;
+  }
+}
+
+/* Reflow guards. A single-column grid's implicit track is `auto`, and a grid item's
+   automatic minimum size is its min-content size, so one unbreakable token — a long
+   station name, an id, a backend message — widens the track and every sibling with it
+   until the page scrolls sideways. An explicit minmax(0, 1fr) makes the token wrap
+   instead. The same automatic minimum stops a flex item shrinking, which is what
+   `min-inline-size: 0` releases. */
+/* Every grid container in the app, not just the ones that have overflowed so far. A grid
+   with no explicit template gets an implicit `auto` track whose automatic minimum is the
+   min-content size of its widest child, and that floor propagates all the way up: at 200%
+   text the native datetime control's intrinsic width pushed the plan form 64px past a 320px
+   viewport through four nested `auto` tracks. */
+.content-panel,
+.journey-skeleton,
+.journey-directions,
+.journey-step,
+.departure-card,
+.status-panel,
+.options-page,
+.options-list,
+.option-card,
+.settings-page,
+.settings-card,
+.demo-page,
+.appointment-form,
+.form-field,
+.offline-save,
+.route-trace,
+.route-trace-figure,
+.route-trace-labels li,
+.route-map,
+.route-map-loading,
+.route-map-unavailable,
+.route-trace-unavailable,
+.disclosure-body,
+.async-feedback,
+.home-action,
+.dialog-body,
+.how-it-helps ol { grid-template-columns: minmax(0, 1fr); }
+
+.site-header > *,
+.section-heading > *,
+.journey-step-head > *,
+.ticket-top > *,
+.option-heading > *,
+.dialog-heading > *,
+.appointment-preview > *,
+.check-row > *,
+.status-foot > *,
+.endpoint > * { min-inline-size: 0; }
+
+/* A nowrap chip is the exception: released from its automatic minimum it shrinks to
+   nothing and spills its own text across the page, so it keeps its intrinsic width and the
+   row wraps under it instead. Crowded rows stack rather than clip. */
+.route-chip,
+.time-delta,
+.journey-duration,
+.section-heading .text-button { flex: none; }
+
+.section-heading,
+.option-heading,
+.dialog-heading,
+.status-foot,
+.journey-step-head,
+.journey-kicker { flex-wrap: wrap; }

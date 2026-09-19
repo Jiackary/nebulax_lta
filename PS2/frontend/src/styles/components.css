@@ -1,0 +1,1064 @@
+/* One block per component, and exactly one owner for each. If two blocks want to style the
+   same element, the element needs a class of its own — not a second, later declaration. */
+
+/* ---- Header controls ---------------------------------------------------------------- */
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target);
+  gap: var(--s-2);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.wordmark span {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  color: var(--on-forest);
+  background: var(--forest);
+  font-size: 0.9375rem;
+}
+
+/* The three header slots share 320px with a 48px control. Both labels stay on one line and
+   lose their tail rather than growing into each other — at 320px "‹ Journey" and "Other ways
+   to travel" met in the middle with no space between them. */
+.header-back {
+  display: inline-flex;
+  overflow: hidden;
+  align-items: center;
+  min-height: var(--target);
+  gap: var(--s-1);
+  padding-inline-end: var(--s-2);
+  color: var(--forest);
+  font-size: var(--text-support);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.header-back span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-back svg { flex: none; }
+
+.header-back:hover { text-decoration: underline; }
+
+.header-title {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-support);
+  font-weight: 700;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-control {
+  display: inline-flex;
+  width: var(--target);
+  height: var(--target);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  background: var(--surface-sunk);
+  text-decoration: none;
+}
+
+.header-control:hover { background: var(--forest-wash); }
+
+/* ---- Buttons ------------------------------------------------------------------------ */
+
+.button {
+  display: inline-flex;
+  min-height: var(--target);
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-6);
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font-display);
+  font-size: var(--text-support);
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--exit) ease, transform var(--press) ease;
+}
+
+.button:active:not(:disabled) { transform: scale(0.985); }
+.button:disabled { opacity: 0.65; cursor: wait; transform: none; }
+
+.button-primary { color: var(--on-forest); background: var(--forest); }
+.button-primary:hover:not(:disabled) { background: var(--forest-deep); }
+
+.button-secondary {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.button-secondary:hover:not(:disabled) { background: var(--forest-wash); }
+
+.button-danger { color: var(--surface); background: var(--critical); }
+
+.text-button {
+  display: inline-flex;
+  min-height: var(--target);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--forest);
+  background: transparent;
+  font-size: var(--text-support);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.text-button:disabled { color: var(--ink-2); cursor: wait; }
+
+/* ---- Page furniture ----------------------------------------------------------------- */
+
+.eyebrow {
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lede { color: var(--ink-2); }
+
+.content-panel { display: grid; align-content: start; gap: var(--s-4); }
+
+.section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3) var(--s-4);
+}
+
+.scope-note { color: var(--ink-2); font-size: var(--text-meta); }
+
+/* ---- Home: the usual-route ticket ---------------------------------------------------- */
+
+.home-intro { color: var(--ink-2); }
+
+.route-ticket {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.ticket-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-4) var(--s-2);
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+}
+
+.route-chip {
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-pill);
+  color: var(--forest);
+  background: var(--forest-wash);
+  font-weight: 700;
+}
+
+.route-endpoints { padding: var(--s-2) var(--s-4) var(--s-4); }
+
+.endpoint {
+  position: relative;
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: 1rem minmax(0, 1fr);
+}
+
+.endpoint:first-child { padding-block-end: var(--s-6); }
+
+.endpoint:first-child::before {
+  position: absolute;
+  top: 1.1rem;
+  bottom: -0.25rem;
+  left: 0.44rem;
+  border-left: 2px dotted var(--line-strong);
+  content: '';
+}
+
+.endpoint-dot {
+  z-index: 1;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.35rem;
+  border: 3px solid var(--forest);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.destination-dot { border-radius: 0.3rem; background: var(--forest); }
+
+.endpoint-label { color: var(--ink-2); font-size: var(--text-meta); }
+.endpoint h2 { margin-top: 0.1rem; font-size: 1.25rem; }
+.endpoint p { color: var(--ink-2); font-size: var(--text-meta); }
+
+.ticket-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line);
+  background: var(--surface-sunk);
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+}
+
+.line-pill {
+  padding: var(--s-1) var(--s-2);
+  border-radius: 0.4rem;
+  color: var(--forest);
+  background: var(--forest-wash);
+  font-weight: 700;
+}
+
+.appointment-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.calendar-symbol {
+  display: grid;
+  flex: 0 0 var(--target);
+  height: var(--target);
+  place-items: center;
+  border-radius: var(--radius-control);
+  color: var(--forest);
+  background: var(--forest-wash);
+}
+
+.appointment-preview h2 { font-size: var(--text-step); }
+.appointment-preview p { color: var(--ink-2); font-size: var(--text-support); }
+
+.home-action { display: grid; gap: var(--s-3); justify-items: center; }
+.home-action .button { width: 100%; justify-content: space-between; }
+
+/* ---- Appointment form ---------------------------------------------------------------- */
+
+.appointment-form { display: grid; gap: var(--s-4); }
+
+/* A fieldset carries a UA `min-inline-size: min-content` that an explicit `min-width: 0`
+   on the element is the only way to release. Without it the native datetime control's
+   intrinsic width at 200% text pushes the form 13px past a 320px viewport. */
+.form-field {
+  display: grid;
+  min-inline-size: 0;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.form-field > label,
+.form-field legend { font-weight: 700; }
+
+/* HTML picks the *rendered legend* — the one that sits in a notch cut out of the fieldset
+   border — as the first legend child whose float is none. Giving it a float disqualifies it,
+   so it flows as an ordinary grid item inside the card instead of straddling the border and
+   spilling past the rounded corner. The float itself is then ignored, because a child of a
+   grid container is never floated. */
+.form-field legend {
+  float: left;
+  padding: 0;
+}
+
+.field-helper {
+  display: block;
+  color: var(--ink-2);
+  font-size: var(--text-support);
+  font-weight: 400;
+}
+
+.form-field input[type='datetime-local'],
+.form-field select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--target);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.form-field input[aria-invalid='true'] { border-color: var(--critical); }
+.form-field select { margin-top: var(--s-1); }
+
+.check-row {
+  display: flex;
+  min-height: var(--target);
+  align-items: start;
+  gap: var(--s-3);
+  padding-block: var(--s-2);
+}
+
+.check-row input {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  margin-top: 0.15rem;
+  accent-color: var(--forest);
+}
+
+.form-error {
+  padding: var(--s-3);
+  border-left: 4px solid var(--critical);
+  border-radius: 0.5rem;
+  color: var(--critical);
+  background: var(--critical-wash);
+  font-size: var(--text-support);
+  font-weight: 600;
+}
+
+.replacement-note {
+  padding: var(--s-3);
+  border-radius: 0.75rem;
+  background: var(--forest-wash);
+  font-size: var(--text-support);
+}
+
+/* ---- Journey: the departure surface --------------------------------------------------- */
+
+.journey-kicker {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  color: var(--ink-2);
+  font-size: var(--text-support);
+}
+
+.journey-kicker-date { color: var(--ink); font-weight: 700; }
+.journey-kicker-date::before { color: var(--ink-2); content: '· '; }
+
+/* The one dominant surface on the page. Everything else is quieter than this on purpose. */
+.departure-card {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-6);
+  border-radius: var(--radius-surface);
+  color: var(--on-forest);
+  background: linear-gradient(155deg, #0f6b50, var(--forest-deep) 78%);
+  box-shadow: var(--shadow);
+}
+
+.departure-label {
+  color: var(--on-forest-2);
+  font-size: var(--text-support);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.departure-time {
+  margin-block: var(--s-1) 0;
+  color: #fff;
+  font-size: var(--text-departure);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+}
+
+/* Non-text emphasis, which is the only safe use of the warm accent on any background. */
+.departure-rule {
+  width: 3rem;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  margin-block: var(--s-3);
+  background: var(--accent);
+}
+
+.departure-arrival {
+  color: #fff;
+  font-size: var(--text-step);
+  font-weight: 700;
+}
+
+.departure-metrics {
+  color: var(--on-forest-2);
+  font-size: var(--text-support);
+}
+
+/* ---- Journey: status ------------------------------------------------------------------ */
+
+.status-panel {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.status-kicker {
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-panel h2 { font-size: var(--text-step); }
+.status-panel > p { font-size: var(--text-support); }
+
+.status-ok { border-left-color: var(--ok); }
+.status-ok .status-kicker { color: var(--ok); }
+.status-info { border-left-color: var(--info); }
+.status-info .status-kicker { color: var(--info); }
+.status-warn { border-left-color: var(--warn); background: var(--warn-wash); }
+.status-warn .status-kicker { color: var(--warn); }
+.status-critical { border-left-color: var(--critical); background: var(--critical-wash); }
+.status-critical .status-kicker { color: var(--critical); }
+.status-pending { border-left-color: var(--line-strong); }
+
+.status-qualification {
+  padding: var(--s-2) var(--s-3);
+  border-radius: 0.5rem;
+  color: var(--warn);
+  background: var(--warn-wash);
+  font-size: var(--text-support);
+  font-weight: 600;
+}
+
+.status-critical .status-qualification { color: var(--critical); background: var(--surface); }
+
+/* The checked time and the refresh control read as one statement: this is how fresh this
+   is, and this is how you make it fresher. */
+.status-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-3);
+  padding-top: var(--s-1);
+}
+
+.status-checked { color: var(--ink-2); font-size: var(--text-meta); }
+.status-simulated {
+  display: inline-block;
+  margin-inline-start: var(--s-2);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+  white-space: nowrap;
+}
+
+/* A labelled control, not a glyph: "↻" alone does not say what it does or what it costs. */
+.refresh-button {
+  display: inline-flex;
+  min-height: var(--target);
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--forest);
+  background: var(--surface);
+  font-size: var(--text-support);
+  font-weight: 700;
+  transition: background-color var(--exit) ease;
+}
+
+.refresh-button:hover:not(:disabled) { background: var(--forest-wash); }
+.refresh-button:disabled { color: var(--ink-2); cursor: wait; }
+.refresh-button svg { flex: none; }
+
+/* Rotation only while a real request is in flight. */
+.refresh-button[data-pending='true'] svg { animation: refresh-spin 1.1s linear infinite; }
+
+@keyframes refresh-spin { to { rotate: 360deg; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-button[data-pending='true'] svg { animation: none; }
+}
+
+/* ---- Journey: the route trace --------------------------------------------------------- */
+
+/* Sits on the canvas rather than in a card, so the departure surface stays the only
+   elevated thing in the summary column. */
+.route-trace { display: grid; gap: var(--s-3); }
+
+.route-trace-figure { display: grid; gap: var(--s-2); }
+
+.route-trace-rail {
+  position: relative;
+  height: 1.25rem;
+}
+
+.route-trace-line { width: 100%; height: 100%; }
+
+/* A custom property cannot be resolved inside an SVG presentation attribute, so the leg
+   strokes are painted here where the tokens are in scope. `pathLength` is set on each line
+   so the dash pattern is a fraction of the leg rather than a fixed length: the walking dots
+   stay evenly spaced whether the trace is 288px or 460px wide. */
+.route-trace-seg {
+  stroke: var(--forest);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.route-trace-seg[data-mode='walk'] {
+  stroke: var(--line-strong);
+  stroke-width: 3;
+  stroke-dasharray: 0.1 9;
+}
+
+/* An affected leg is drawn dashed and in the map's own warning colour, so the two pictures
+   of the same journey agree. The reason is written next to it as well — the dash is the
+   emphasis, never the message. */
+.route-trace-seg[data-impact='warn'] { stroke: var(--impact-warn); stroke-dasharray: 6 4; }
+.route-trace-seg[data-impact='critical'] { stroke: var(--impact-critical); stroke-dasharray: 6 4; }
+
+/* Nodes are HTML, positioned at the same fractions the SVG uses, so a node is never
+   distorted by the non-uniform scaling that keeps the trace responsive. */
+.route-node {
+  position: absolute;
+  top: 50%;
+  left: var(--at);
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 3px solid var(--forest);
+  border-radius: 50%;
+  background: var(--canvas);
+  translate: -50% -50%;
+}
+
+.route-node[data-endpoint='true'] {
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 0.3rem;
+  background: var(--forest);
+}
+
+.route-trace-labels {
+  display: grid;
+  padding: 0;
+  gap: var(--s-2);
+  grid-template-columns: repeat(var(--nodes), minmax(0, 1fr));
+  list-style: none;
+}
+
+.route-trace-labels li {
+  display: grid;
+  gap: 0.1rem;
+  text-align: center;
+  align-content: start;
+}
+
+/* Two lines, cut at a word. `overflow-wrap: anywhere` is deliberately not used here: in a
+   64px column it snaps names mid-syllable ("Singapor / e General"), which is harder to read
+   than a name that is visibly shortened. The clamp box contains anything that still will not
+   fit, so a long word can never widen the track. */
+.route-node-name {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  hyphens: auto;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.route-node-meta { color: var(--ink-2); font-size: 0.75rem; line-height: 1.25; }
+
+.route-trace-modes {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0;
+  gap: var(--s-1) var(--s-3);
+  list-style: none;
+  font-size: var(--text-meta);
+  color: var(--ink-2);
+}
+
+.route-trace-modes li { display: flex; align-items: center; gap: var(--s-2); }
+
+.route-trace-key {
+  width: 1.4rem;
+  height: 0;
+  flex: none;
+  border-top: 3px solid var(--forest);
+}
+
+.route-trace-key[data-mode='walk'] { border-top-style: dotted; border-top-width: 4px; }
+.route-trace-key[data-impact='warn'] { border-top: 3px dashed var(--impact-warn); }
+.route-trace-key[data-impact='critical'] { border-top: 3px dashed var(--impact-critical); }
+.route-trace-modes li[data-impact='warn'] { color: var(--warn); font-weight: 600; }
+.route-trace-modes li[data-impact='critical'] { color: var(--critical); font-weight: 600; }
+
+.route-trace-affected {
+  color: var(--warn);
+  font-size: var(--text-meta);
+  font-weight: 600;
+}
+
+.route-trace[data-worst='critical'] .route-trace-affected { color: var(--critical); }
+
+.route-trace-note {
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+
+.route-trace-unavailable {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-control);
+  color: var(--ink-2);
+  font-size: var(--text-support);
+}
+
+.route-trace-unavailable strong { color: var(--ink); }
+
+/* ---- Journey: the map ------------------------------------------------------------------ */
+
+.route-map {
+  display: grid;
+  overflow: hidden;
+  gap: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.route-map-canvas { width: 100%; height: 16rem; background: var(--surface-sunk); }
+
+.route-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 var(--s-4) var(--s-4);
+  gap: var(--s-2) var(--s-4);
+  list-style: none;
+  color: var(--ink-2);
+  font-size: var(--text-meta);
+}
+
+.route-map-legend li { display: flex; align-items: center; gap: var(--s-2); }
+
+.route-key { width: 1.6rem; height: 0.3rem; flex: none; border-radius: 0.15rem; }
+.route-key-clear { background: var(--ok); }
+.route-key-warn { background: repeating-linear-gradient(90deg, #b26a00 0 7px, transparent 7px 12px); }
+.route-key-critical { background: repeating-linear-gradient(90deg, #b3261e 0 7px, transparent 7px 12px); }
+
+.route-map-loading,
+.route-map-unavailable {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  color: var(--ink-2);
+  font-size: var(--text-support);
+}
+
+.route-map-unavailable strong { color: var(--ink); }
+.maplibregl-ctrl-attrib { font-size: 0.75rem; }
+
+@media (min-width: 390px) { .route-map-canvas { height: 18rem; } }
+@media (min-width: 960px) { .route-map-canvas { height: 20rem; } }
+
+/* ---- Journey: the timeline -------------------------------------------------------------- */
+
+/* Mostly borderless. The steps are a list of instructions, not five more cards. */
+.journey-directions { display: grid; align-content: start; gap: var(--s-4); }
+
+.journey-timeline {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.journey-leg {
+  position: relative;
+  display: grid;
+  gap: var(--s-1) var(--s-3);
+  grid-template-columns: 2rem minmax(0, 1fr);
+  padding-block-end: var(--s-6);
+}
+
+.journey-leg:last-child { padding-block-end: 0; }
+
+.journey-leg::before {
+  position: absolute;
+  top: 2.25rem;
+  bottom: 0.25rem;
+  left: 0.95rem;
+  border-left: 2px solid var(--line-strong);
+  content: '';
+}
+
+.journey-leg:last-child::before { display: none; }
+.journey-leg[data-mode='walk']::before { border-left-style: dotted; }
+
+.journey-marker {
+  z-index: 1;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--forest);
+  background: var(--forest-wash);
+  box-shadow: 0 0 0 4px var(--canvas);
+  font-size: var(--text-meta);
+  font-weight: 800;
+}
+
+.journey-step { display: grid; gap: var(--s-1); }
+
+.journey-step-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-3);
+}
+
+.journey-step h3 { min-inline-size: 0; }
+
+.journey-duration {
+  flex: none;
+  color: var(--ink-2);
+  font-family: var(--font-display);
+  font-size: var(--text-support);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.journey-mode {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.mode-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--ink-2);
+}
+
+.mode-rail { background: var(--forest); }
+
+.journey-detail { color: var(--ink-2); font-size: var(--text-support); }
+.journey-access { color: var(--ink-2); font-size: var(--text-support); }
+
+.journey-warning {
+  padding: var(--s-2) var(--s-3);
+  border-radius: 0.5rem;
+  margin-top: var(--s-1);
+  color: var(--warn);
+  background: var(--warn-wash);
+  font-size: var(--text-support);
+  font-weight: 600;
+}
+
+/* A critical impact is red wherever it appears, so the step, the trace and the status panel
+   are visibly describing one event rather than three different ones. */
+.journey-warning[data-impact='critical'] { color: var(--critical); background: var(--critical-wash); }
+
+.journey-route-warning { border-left: 4px solid var(--warn); }
+
+/* A native disclosure: no JavaScript, no animation to interrupt, and its content is still
+   findable with the browser's own find-in-page in every current browser. */
+.disclosure {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.disclosure > summary {
+  display: flex;
+  min-height: var(--target);
+  align-items: center;
+  gap: var(--s-2);
+  padding-block: var(--s-2);
+  color: var(--forest);
+  font-size: var(--text-support);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker { display: none; }
+
+.disclosure > summary::after {
+  margin-left: auto;
+  content: '▾';
+  transition: rotate var(--exit) ease;
+}
+
+.disclosure[open] > summary::after { rotate: 180deg; }
+
+.disclosure-body {
+  display: grid;
+  gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-4);
+  color: var(--ink-2);
+  font-size: var(--text-support);
+}
+
+/* ---- Journey: actions and attribution ------------------------------------------------- */
+
+.offline-save { display: grid; gap: var(--s-2); }
+.offline-save .button { width: 100%; }
+.offline-saved { color: var(--forest); font-size: var(--text-support); font-weight: 700; }
+
+.offline-notice {
+  padding: var(--s-2) var(--s-3);
+  border-left: 4px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--warn-wash);
+  color: var(--ink);
+  font-size: var(--text-support);
+  font-weight: 600;
+}
+
+/* OSM and OneMap attribution is a licence condition, not a style choice. It stays
+   readable and it never leaves the page. */
+.attribution {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+
+/* ---- Alternatives --------------------------------------------------------------------- */
+
+.options-page { display: grid; align-content: start; gap: var(--s-4); }
+.options-list { display: grid; gap: var(--s-3); }
+
+.original-option,
+.not-offered {
+  display: grid;
+  gap: var(--s-1);
+  padding: var(--s-4);
+  border-radius: var(--radius-control);
+  background: var(--forest-wash);
+  font-size: var(--text-support);
+}
+
+.original-option span,
+.not-offered p { color: var(--ink-2); }
+
+.option-card {
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.option-card h2 { font-size: var(--text-step); }
+.option-card > p { font-size: var(--text-support); }
+
+.option-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.time-delta {
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-pill);
+  color: var(--warn);
+  background: var(--warn-wash);
+  font-size: var(--text-meta);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.option-basis { color: var(--ink-2); font-size: 0.8125rem; }
+.option-skeleton { min-height: 9rem; }
+
+/* ---- Settings and demo ------------------------------------------------------------------ */
+
+.settings-page,
+.demo-page { display: grid; align-content: start; gap: var(--s-4); }
+
+.settings-card {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  justify-items: start;
+}
+
+.settings-card h2 { font-size: var(--text-step); }
+.settings-card p { font-size: var(--text-support); }
+
+.demo-toggle {
+  display: flex;
+  min-height: var(--target);
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: var(--text-support);
+  font-weight: 600;
+}
+
+.demo-toggle input { width: 1.5rem; height: 1.5rem; margin: 0; accent-color: var(--forest); }
+
+/* ---- Dialog ------------------------------------------------------------------------------ */
+
+.dialog-backdrop {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  background: rgb(10 35 25 / 45%);
+}
+
+.dialog {
+  width: min(100%, 34rem);
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: var(--s-6) var(--s-4) max(var(--s-6), env(safe-area-inset-bottom));
+  border-radius: var(--radius-surface) var(--radius-surface) 0 0;
+  background: var(--surface);
+}
+
+.dialog-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.dialog-heading h2 { font-size: var(--text-section); }
+
+.dialog-close {
+  min-width: var(--target);
+  min-height: var(--target);
+  padding-inline: var(--s-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--forest);
+  background: var(--forest-wash);
+  font-weight: 700;
+}
+
+.dialog-body { display: grid; gap: var(--s-4); margin-top: var(--s-4); font-size: var(--text-support); }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+
+@media (min-width: 768px) {
+  .dialog-backdrop { place-items: center; padding: var(--s-6); }
+  .dialog { border-radius: var(--radius-surface); padding-inline: var(--s-6); }
+}
+
+/* ---- Asynchronous feedback and skeletons --------------------------------------------- */
+
+.async-feedback {
+  display: grid;
+  gap: var(--s-2);
+  padding-block: var(--s-2);
+  color: var(--ink-2);
+  font-size: var(--text-support);
+}
+
+.async-feedback-slow { color: var(--ink); }
+
+.progress-line {
+  display: block;
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+}
+
+.progress-line::after {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--forest);
+  animation: progress-slide 1.35s ease-in-out infinite;
+  content: '';
+}
+
+.skeleton {
+  display: block;
+  border-radius: 0.5rem;
+  background: var(--surface-sunk);
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.journey-skeleton { display: grid; gap: var(--s-4); align-content: start; }
+
+.journey-skeleton-hero,
+.journey-skeleton-steps {
+  display: grid;
+  gap: var(--s-3);
+  padding: var(--s-6);
+  border-radius: var(--radius-surface);
+  background: var(--surface-sunk);
+}
+
+.journey-skeleton-overview {
+  display: grid;
+  min-height: 11rem;
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.skeleton-title { width: 55%; height: 3rem; }
+.skeleton-line { width: 100%; height: 1rem; }
+.skeleton-short { width: 62%; }
+.skeleton-overview { width: 100%; height: 9rem; border-radius: var(--radius-control); }
+
+@keyframes progress-slide { from { transform: translateX(-110%); } to { transform: translateX(250%); } }
+@keyframes skeleton-pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-line::after,
+  .skeleton { animation: none; }
+}

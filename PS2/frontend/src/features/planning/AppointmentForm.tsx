@@ -7,31 +7,34 @@ import { formatSingaporeDateTime, singaporeDateTimeToIso, validateSingaporeDateT
 import { AsyncFeedback } from '../../components/AsyncFeedback'
 import { setActiveTripId } from './activeTrip'
 
-function futureSingaporeDateTime() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Singapore', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date(Date.now() + 24 * 60 * 60 * 1000))
-  const value = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]))
-  return `${value.year}-${value.month}-${value.day}T${value.hour}:${value.minute}`
-}
-
 export function AppointmentForm() {
   const navigate = useNavigate()
-  const [appointmentAt, setAppointmentAt] = useState(futureSingaporeDateTime)
+  // No default. Tomorrow at the current minute is not an appointment anyone has; pre-filling
+  // it invites a journey planned for a time the reader never chose.
+  const [appointmentAt, setAppointmentAt] = useState('')
   const [preferSheltered, setPreferSheltered] = useState(true)
   const [bufferMin, setBufferMin] = useState(15)
-  const [error, setError] = useState<string | null>(null)
+  // The field error describes the input; the form error describes the request. A failed
+  // network call must not mark a perfectly valid date as invalid.
+  const [fieldError, setFieldError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const preview = appointmentAt && !validateSingaporeDateTime(appointmentAt)
+    ? formatSingaporeDateTime(singaporeDateTimeToIso(appointmentAt))
+    : null
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting) return
     const invalid = validateSingaporeDateTime(appointmentAt)
     if (invalid) {
-      setError(invalid)
+      setFieldError(appointmentAt ? invalid : 'Choose the date and time of your appointment.')
+      setFormError(null)
       return
     }
-    setError(null)
+    setFieldError(null)
+    setFormError(null)
     setSubmitting(true)
     try {
       const trip = await createTrip({
@@ -42,11 +45,11 @@ export function AppointmentForm() {
       try {
         setActiveTripId(trip.trip_id)
       } catch {
-        setError('Your journey is ready, but this device could not save it for next time.')
+        setFormError('Your journey is ready, but this device could not save it for next time.')
       }
       navigate(`/trip/${encodeURIComponent(trip.trip_id)}`)
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : 'We could not plan your journey. Please try again.')
+      setFormError(reason instanceof ApiError ? reason.message : 'We could not plan your journey. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -56,9 +59,20 @@ export function AppointmentForm() {
     <form className="appointment-form" onSubmit={submit} noValidate>
       <div className="form-field">
         <label htmlFor="appointment-at">Appointment date and time</label>
-        <span id="appointment-help">Singapore time</span>
-        <input id="appointment-at" name="appointment-at" type="datetime-local" value={appointmentAt} aria-describedby="appointment-help appointment-error" aria-invalid={Boolean(error)} disabled={submitting} onChange={(event) => setAppointmentAt(event.target.value)} />
-        {!validateSingaporeDateTime(appointmentAt) && <span>{formatSingaporeDateTime(singaporeDateTimeToIso(appointmentAt))}</span>}
+        <span className="field-helper" id="appointment-help">Singapore time. Choose the time printed on your appointment letter.</span>
+        <input
+          id="appointment-at"
+          name="appointment-at"
+          type="datetime-local"
+          value={appointmentAt}
+          required
+          aria-describedby={fieldError ? 'appointment-help appointment-field-error' : 'appointment-help'}
+          aria-invalid={Boolean(fieldError)}
+          disabled={submitting}
+          onChange={(event) => { setAppointmentAt(event.target.value); setFieldError(null) }}
+        />
+        {preview && <span className="field-helper">{preview}</span>}
+        {fieldError && <p id="appointment-field-error" className="form-error" role="alert">{fieldError}</p>}
       </div>
       <fieldset className="form-field" disabled={submitting}>
         <legend>Journey preferences</legend>
@@ -70,7 +84,7 @@ export function AppointmentForm() {
           </select>
         </label>
       </fieldset>
-      {error && <p id="appointment-error" className="form-error" role="alert">{error}</p>}
+      {formError && <p className="form-error" role="alert">{formError}</p>}
       <AsyncFeedback operation={submitting ? 'creating-trip' : 'idle'} label="Preparing your journey…" />
       <button className="button button-primary" type="submit" disabled={submitting}>{submitting ? 'Planning journey…' : 'Plan journey'}</button>
     </form>

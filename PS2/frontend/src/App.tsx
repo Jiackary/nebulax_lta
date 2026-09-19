@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react'
-import { BrowserRouter, Link, Route, Routes, useParams, useLocation } from 'react-router-dom'
+import { BrowserRouter, Link, Route, Routes, useParams } from 'react-router-dom'
 
 import { AlternativesPage } from './features/alternatives/AlternativesPage'
 import { DemoPage } from './features/demo/DemoPage'
@@ -8,38 +7,16 @@ import { JourneyPage } from './features/journey/JourneyPage'
 import { JourneyProvider } from './features/journey/JourneyProvider'
 import { getActiveTripId } from './features/planning/activeTrip'
 import { SettingsPage } from './features/settings/SettingsPage'
-import './styles/global.css'
-import './styles/native.css'
-import './styles/feedback.css'
+import { PageShell } from './components/PageShell'
+import './styles/index.css'
 
-function PageShell({ children }: { children: React.ReactNode }) {
-  const { pathname } = useLocation()
-  const mainRef = useRef<HTMLElement>(null)
-  const parent = pathname.endsWith('/options') ? pathname.replace(/\/options$/, '') : '/'
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' })
-    mainRef.current?.focus({ preventScroll: true })
-  }, [pathname])
-  return (
-    <div className="app-shell">
-      <header className="site-header">
-        {pathname !== '/' && <Link className="header-control" to={parent} aria-label="Back to previous screen">←</Link>}
-        <Link className="wordmark" to="/" aria-label="Nusa journey home">
-          <span aria-hidden="true">N</span>
-          Nusa
-        </Link>
-        {pathname !== '/settings' && <Link className="header-control settings-control" to="/settings" aria-label="Journey settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="16" cy="17" r="3" fill="currentColor" stroke="none"/></svg></Link>}
-      </header>
-      <main ref={mainRef} tabIndex={-1}>{children}</main>
-    </div>
-  )
-}
+const HOME = { to: '/', label: 'Home' }
 
 function HomePage() {
   const tripId = getActiveTripId()
   return (
     <PageShell>
-      <section className="hero-panel" aria-labelledby="home-heading">
+      <section aria-labelledby="home-heading">
         <p className="eyebrow">Your day, at your pace</p>
         <h1 id="home-heading">Your journey</h1>
         <p className="home-intro">A little preparation. A calmer trip.</p>
@@ -47,30 +24,44 @@ function HomePage() {
       <section className="route-ticket" aria-label="Your usual route">
         <div className="ticket-top"><span>Your usual route</span><span className="route-chip">Hospital visit</span></div>
         <div className="route-endpoints">
-          <div className="endpoint"><span className="endpoint-dot"/><div><span className="endpoint-label">From home</span><h2>Bedok</h2><p>Blk 208B New Upper Changi Road</p></div></div>
-          <div className="endpoint"><span className="endpoint-dot destination-dot"/><div><span className="endpoint-label">To your appointment</span><h2>Singapore General Hospital</h2><p>Block 3 · Outram Park</p></div></div>
+          <div className="endpoint"><span className="endpoint-dot" /><div><span className="endpoint-label">From home</span><h2>Bedok</h2><p>Blk 208B New Upper Changi Road</p></div></div>
+          <div className="endpoint"><span className="endpoint-dot destination-dot" /><div><span className="endpoint-label">To your appointment</span><h2>Singapore General Hospital</h2><p>Block 3 · Outram Park</p></div></div>
         </div>
         <div className="ticket-footer"><span>Walk</span><span aria-hidden="true">—</span><span className="line-pill">East–West Line</span><span aria-hidden="true">—</span><span>Walk</span></div>
       </section>
-      <section className="appointment-preview"><span className="calendar-symbol" aria-hidden="true">▦</span><div><h2>{tripId ? 'Your saved journey is ready' : 'When is your appointment?'}</h2><p>{tripId ? 'Open it to check your departure and route.' : 'Add a time to find out when to leave.'}</p></div></section>
-      <div className="home-action"><Link className="button button-primary" to={tripId ? `/trip/${encodeURIComponent(tripId)}` : '/plan'}>{tripId ? 'Open journey' : 'Plan journey'}<span aria-hidden="true">→</span></Link>{tripId && <Link className="text-button" to="/plan">New appointment</Link>}</div>
+      {/* An active id proves a journey was saved on this device. It does not prove the journey
+          is still on the server, still in the future, or still step-free, so this claims
+          nothing beyond what the id actually establishes. */}
+      <section className="appointment-preview">
+        <span className="calendar-symbol" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M8 3v4M16 3v4M3 10h18" /></svg>
+        </span>
+        <div>
+          <h2>{tripId ? 'You have a saved journey' : 'When is your appointment?'}</h2>
+          <p>{tripId ? 'Open it to check your departure and route.' : 'Add a time to find out when to leave.'}</p>
+        </div>
+      </section>
+      <div className="home-action">
+        <Link className="button button-primary" to={tripId ? `/trip/${encodeURIComponent(tripId)}` : '/plan'}>{tripId ? 'Open saved journey' : 'Plan journey'}<span aria-hidden="true">→</span></Link>
+        {tripId && <Link className="text-button" to="/plan">New appointment</Link>}
+      </div>
       <p className="scope-note">Currently available for your Bedok → SGH journey.</p>
     </PageShell>
   )
 }
 
 function SettingsRoute() {
-  return <PageShell><SettingsPage tripId={getActiveTripId()} /></PageShell>
+  return <PageShell title="Settings" back={HOME}><SettingsPage tripId={getActiveTripId()} /></PageShell>
 }
 
 function DemoRoute() {
   if (import.meta.env.VITE_ENABLE_DEMO !== 'true') return <NotFoundPage />
-  return <PageShell><DemoPage /></PageShell>
+  return <PageShell title="Demo" back={HOME}><DemoPage /></PageShell>
 }
 
 function PlanPage() {
   return (
-    <PageShell>
+    <PageShell title="New appointment" back={HOME}>
       <section className="content-panel">
         <p className="eyebrow">New appointment</p>
         <h1>Appointment details</h1>
@@ -84,7 +75,7 @@ function PlanPage() {
 
 function NotFoundPage() {
   return (
-    <PageShell>
+    <PageShell title="Not found" back={HOME}>
       <section className="content-panel">
         <p className="eyebrow">Journey companion</p>
         <h1>Page not found</h1>
@@ -99,7 +90,7 @@ function TripRoute() {
   const { tripId } = useParams()
   if (!tripId) return <NotFoundPage />
   return (
-    <PageShell>
+    <PageShell title="Your journey" back={HOME} wide>
       <JourneyProvider tripId={tripId}><JourneyPage tripId={tripId} /></JourneyProvider>
     </PageShell>
   )
@@ -108,7 +99,11 @@ function TripRoute() {
 function AlternativesRoute() {
   const { tripId } = useParams()
   if (!tripId) return <NotFoundPage />
-  return <PageShell><AlternativesPage tripId={tripId} /></PageShell>
+  return (
+    <PageShell title="Options" back={{ to: `/trip/${encodeURIComponent(tripId)}`, label: 'Journey' }}>
+      <AlternativesPage tripId={tripId} />
+    </PageShell>
+  )
 }
 
 function App() {

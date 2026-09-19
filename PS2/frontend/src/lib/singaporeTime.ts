@@ -33,3 +33,20 @@ export function formatSingaporeDateTime(value: string) {
     timeZone: 'Asia/Singapore',
   }).format(parsed)
 }
+
+/**
+ * The clock face alone, for the departure lockup where the surrounding copy already says
+ * what the number is. Derived from the ISO instant rather than by stripping English words
+ * off the backend's label, which would break the moment that label is reworded or localised.
+ * Returns null when the value cannot be parsed, so the caller can fall back to the label.
+ */
+export function formatSingaporeClock(value: string) {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Asia/Singapore',
+  }).format(parsed)
+}

@@ -14,7 +14,13 @@ export default defineConfig({
       // Offline tile caching is parked on licensing grounds, so a cached map can never
       // draw a basemap. Precaching its 1 MB chunk would cost her mobile data to store
       // something offline can't use; let it load from the network when the map is opened.
-      injectManifest: { globIgnores: ['**/RouteMap-*.js', '**/RouteMap-*.css', '**/maplibre-gl-worker-*.js'] },
+      // The 24 KiB font is precached deliberately: offline is exactly when she opens the
+      // saved journey, and a departure time that reflows when the font arrives is worse
+      // than one that never had to.
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,woff2}'],
+        globIgnores: ['**/RouteMap-*.js', '**/RouteMap-*.css', '**/maplibre-gl-worker-*.js'],
+      },
       // Production builds get a registration script injected automatically, but dev builds
       // do not: without this the worker never installs on :5173, navigator.serviceWorker.ready
       // stays pending, and push reminders cannot be exercised outside a preview build.
