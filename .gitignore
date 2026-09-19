@@ -13,3 +13,6 @@ PS2/backend/data/cache/
 __pycache__/
 *.pyc
 PS2/backend/data/ps2.sqlite3
+
+# PS2 frontend — regenerated screenshot evidence (npx playwright test e2e/screenshots.spec.ts)
+PS2/evidence/screens/
