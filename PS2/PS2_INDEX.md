@@ -486,9 +486,19 @@ submission missing any of 3.2.1–3.2.3 at level 3 on the part of the score it c
 **How the error happened.** Two different things were conflated. Backend issue I6 parked
 *offline tile caching* for a real licensing reason — `backend/app/api/offline.py:81`
 returns "No tile provider whose terms permit offline caching has been chosen." That
-narrow parked item was widened into "no maps". `PS2_UX_POLISH_PLAN.md` then deferred the
-map to `PS2_CONSOLIDATED_ROADMAP.md` ("Those programmes remain in..."), but that roadmap's
-ten tasks contain no map task. It fell through the gap between two documents.
+narrow parked item was then widened, in four steps across four documents:
+
+1. `PS2_FRONTEND_PLAN.md` §1 — "Map scope decision: first release uses a collapsible
+   lightweight route sketch... **No base tiles, provider key**". The origin: the map is
+   downgraded to a tile-less sketch to keep a licensing choice off the critical path.
+2. `PS2_UX_POLISH_PLAN.md` — "Do not... select a map-tile provider as part of UI polish.
+   Those programmes remain in `PS2_CONSOLIDATED_ROADMAP.md`."
+3. `PS2_CONSOLIDATED_ROADMAP.md` §8 — sequences Tasks 1–10, **none of which is the map**.
+   The deferral in step 2 had no landing place.
+4. `PS2_DESIGN_REFINEMENT_PLAN.md` — "geographic maps remain outside this frontend pass."
+
+Each step is locally reasonable. Together they dropped a mandatory capability, and no
+single document records the decision to do so.
 
 **Resolution.** D14 stands; the map is in scope. Offline tile caching stays parked — the
 brief's quiet-feed allowance covers shipping written steps offline, and `offline.py`

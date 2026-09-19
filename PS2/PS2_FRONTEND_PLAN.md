@@ -7,6 +7,16 @@
 > stated below specifies "TypeScript strict mode" and axe-core; neither is actually in
 > effect in the built code — `strict` is absent from every `tsconfig` and axe is never
 > run. See `PS2_INDEX.md` §11.4.
+>
+> **§1's "Map scope decision" is withdrawn.** It is the earliest of the four documents
+> that narrowed the map, and the origin of the chain traced in `PS2_INDEX.md` §11.2:
+> a tile-less "route sketch" here, then a deferred provider choice in
+> `PS2_UX_POLISH_PLAN.md`, then no map task in `PS2_CONSOLIDATED_ROADMAP.md`, then
+> "geographic maps remain outside this frontend pass" in
+> `PS2_DESIGN_REFINEMENT_PLAN.md`. Each step was locally reasonable; together they
+> dropped a mandatory capability. `PS2_README.md` §3.2.3 requires the route on a map
+> with the affected portion distinguished, and `PS2_DECISION_RECORD.md` D14 lists it
+> under "Never cut". Offline tiles stay parked; the online map is in scope.
 
 > For agentic workers: use the executing-plans skill to implement one task at a time. Use the checkboxes to track progress. Do not implement this entire document in one turn. Implementation has not started.
 
