@@ -1,4 +1,4 @@
-# Nusa: independent design review and implementation handoff
+# Wobble: independent design review and implementation handoff
 
 Reviewed 19 September 2026 against `66f7197` on `codex/frontend`.
 This is a planning deliverable; application code was not changed in this pass.
@@ -45,7 +45,7 @@ Likely inspection points, not proven causes: automatic grid minimums; fixed mark
 
 ## Design direction: a calm transit companion
 
-Retain Nusa's forest green identity. Make the signature element a crisp departure board connected to a purposeful route ribbon. The first glance answers: when should I leave, what is the current confidence, and where am I going? The next glance exposes the steps. Treat the requested Awwwards standard as a craft bar: deliberate composition, typography, transitions and complete edge states. An award itself is not a measurable acceptance criterion.
+Retain Wobble's forest green identity. Make the signature element a crisp departure board connected to a purposeful route ribbon. The first glance answers: when should I leave, what is the current confidence, and where am I going? The next glance exposes the steps. Treat the requested Awwwards standard as a craft bar: deliberate composition, typography, transitions and complete edge states. An award itself is not a measurable acceptance criterion.
 
 - Canvas: warm off-white `#F4F5F0`; ink `#12271F`; secondary text `#536259`; forest `#0D6048`; a restrained warm accent `#D8A35F`. Validate actual contrast on all backgrounds. Reserve amber/red for meaningful warnings; colour always accompanies text/icons.
 - Typography: locally hosted, licensed Manrope variable for the departure and headings; system sans for body. Include the font licence and `font-display: swap`. One WOFF2 asset, target <=60 KiB compressed; use system fallback if the asset cannot meet the budget. Body 18px with 1.5 line height; supporting text >=16px except attribution. Departure 56–72px, tabular numerals; headings 24–32px. Use rem-based values so text enlargement works.
@@ -58,7 +58,7 @@ Retain Nusa's forest green identity. Make the signature element a crisp departur
 
 ```text
 MOBILE / JOURNEY                 HOME / NO ACTIVE PLAN
-‹ Home     Journey     Settings  Nusa                  Settings
+‹ Home     Journey     Settings  Wobble                Settings
                                 Plan your next
 Hospital visit · Mon 21 Sep      hospital visit
 ┌──────────────────────────┐    Your usual route

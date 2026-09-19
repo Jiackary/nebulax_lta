@@ -1,4 +1,4 @@
-# Nusa UI/UX polish — independent review and implementation handoff
+# Wobble UI/UX polish — independent review and implementation handoff
 
 > **Superseded in part — reconciled 19 Sep 2026; see `PS2_INDEX.md` §11.**
 > `PS2_DESIGN_REFINEMENT_PLAN.md` supersedes the **visual and motion** portions of this
@@ -55,7 +55,7 @@ Wireframes show hierarchy, not exact colours. Use flexible content heights; the 
 
 ```text
 ┌──────────────────────────────────┐
-│ Nusa                  [Settings] │
+│ Wobble                [Settings] │
 │ Your next appointment            │
 │ Sun, 20 Sep · 10:30 am            │
 │ Singapore General Hospital       │

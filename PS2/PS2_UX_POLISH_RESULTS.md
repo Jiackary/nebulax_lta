@@ -1,4 +1,4 @@
-# Nusa UI/UX polish results
+# Wobble UI/UX polish results
 
 > **Qualified — historical record. Reconciled 19 Sep 2026; see `PS2_INDEX.md` §11.1.**
 > `PS2_DESIGN_REFINEMENT_PLAN.md`, written 38 minutes after this file, reviews the same
