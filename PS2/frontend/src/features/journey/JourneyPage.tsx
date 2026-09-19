@@ -7,6 +7,7 @@ import { SaveOfflineButton } from '../offline/SaveOfflineButton'
 import { AsyncFeedback } from '../../components/AsyncFeedback'
 import { JourneySkeleton } from './JourneySkeleton'
 import { RouteOverview } from './RouteOverview'
+import { RouteMapPanel } from './RouteMapPanel'
 
 export function JourneyPage({ tripId }: { tripId: string }) {
   const { phase, snapshot, message, refresh, operation } = useJourney()
@@ -28,6 +29,7 @@ export function JourneyPage({ tripId }: { tripId: string }) {
       <StatusPanel status={status} routeConfirmed={routeConfirmed} statusFreshness={snapshot.statusFreshness} />
       {snapshot.warnings.map((warning) => <p className="journey-warning journey-route-warning" role="alert" key={warning}>{warning}</p>)}
       <RouteOverview legs={plan.legs} />
+      <RouteMapPanel legs={plan.legs} map={plan.map} status={status} />
       <section className="timeline-panel" aria-labelledby="steps-heading">
         <div className="section-heading"><div><p className="eyebrow">Your route</p><h2 id="steps-heading">Journey steps</h2></div><Link className="text-button" to={`/trip/${encodeURIComponent(tripId)}/options`}>See options</Link></div>
         <JourneyTimeline plan={plan} />

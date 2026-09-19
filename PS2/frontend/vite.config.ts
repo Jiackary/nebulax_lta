@@ -11,6 +11,10 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'prompt',
+      // Offline tile caching is parked on licensing grounds, so a cached map can never
+      // draw a basemap. Precaching its 1 MB chunk would cost her mobile data to store
+      // something offline can't use; let it load from the network when the map is opened.
+      injectManifest: { globIgnores: ['**/RouteMap-*.js', '**/RouteMap-*.css', '**/maplibre-gl-worker-*.js'] },
       // Production builds get a registration script injected automatically, but dev builds
       // do not: without this the worker never installs on :5173, navigator.serviceWorker.ready
       // stays pending, and push reminders cannot be exercised outside a preview build.
@@ -26,7 +30,17 @@ export default defineConfig({
       },
     }),
   ],
+  // MapLibre starts its worker with { type: 'module' }, so the bundled worker must be ESM.
+  worker: { format: 'es' },
   server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      '/openapi.json': 'http://127.0.0.1:8000',
+    },
+  },
+  // `vite preview` does not inherit server.proxy, so a production build served locally
+  // could not reach the API at all. Verifying a build is the whole point of preview.
+  preview: {
     proxy: {
       '/api': 'http://127.0.0.1:8000',
       '/openapi.json': 'http://127.0.0.1:8000',
