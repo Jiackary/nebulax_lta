@@ -29,7 +29,7 @@ export function AlternativesPage({ tripId }: { tripId: string }) {
 
   return (
     <section className="options-page">
-      <div className="section-heading"><div><p className="eyebrow">Other ways to travel</p><h1>Compare your options</h1></div><Link className="text-button" to={`/trip/${encodeURIComponent(tripId)}`}>Back to journey</Link></div>
+      <div><p className="eyebrow">Other ways to travel</p><h1>Compare your options</h1></div>
       <p className="lede">These are information only. Choosing an option does not change your saved journey.</p>
       <section className="original-option"><strong>Usual route</strong><span>{alternatives.original.viable ? 'Still available' : 'May not be available'} · {alternatives.original.note}</span></section>
       <div className="options-list">{alternatives.options.map((option) => <OptionCard key={option.option_id} option={option} />)}</div>

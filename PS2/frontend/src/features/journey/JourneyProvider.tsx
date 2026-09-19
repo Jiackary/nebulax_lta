@@ -4,6 +4,7 @@ import { getOfflineBundle, getStatus, getTrip } from '../../api/trips'
 import { readOfflineBundle } from '../offline/storage'
 import { JourneyCoordinator, type JourneyState } from './journeyCoordinator'
 import { JourneyContext } from './journeyContext'
+import { useAutoRefresh } from './useAutoRefresh'
 
 export function JourneyProvider({ children, tripId }: { children: ReactNode; tripId: string }) {
   const [state, setState] = useState<JourneyState>({ phase: 'loading', operation: 'loading-plan', snapshot: null, message: null })
@@ -35,6 +36,15 @@ export function JourneyProvider({ children, tripId }: { children: ReactNode; tri
   }, [tripId])
 
   const refresh = useCallback(() => coordinatorRef.current?.refresh() ?? Promise.resolve(), [])
+  const markStale = useCallback(() => coordinatorRef.current?.markStale(), [])
+  // A journey saved for offline reading has no live status to keep current, and refetching
+  // it would only replace her written steps with an error.
+  useAutoRefresh({
+    receivedAt: state.snapshot?.source === 'network' ? state.snapshot.receivedAt : null,
+    refresh,
+    markStale,
+    enabled: state.snapshot?.source === 'network',
+  })
   const prepareOffline = useCallback(() => {
     if (!coordinatorRef.current) return Promise.reject(new Error('This journey is no longer available.'))
     return coordinatorRef.current.prepareOffline()

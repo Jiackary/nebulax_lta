@@ -15,4 +15,10 @@ describe('Singapore appointment time', () => {
   it('rejects an incomplete date-time value', () => {
     expect(validateSingaporeDateTime('2026-10-20T09')).toBe('Choose an appointment date and time.')
   })
+
+  // A saved journey read back from this device is the one screen with no network to fall back
+  // on. Throwing here would blank it, so an unreadable stamp comes back as itself.
+  it('returns an unparseable stamp unchanged instead of throwing', () => {
+    expect(formatSingaporeDateTime('not a date')).toBe('not a date')
+  })
 })

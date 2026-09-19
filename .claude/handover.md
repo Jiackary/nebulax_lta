@@ -1,229 +1,342 @@
-# Handover — PS2 frontend takeover: five fixes and a UI skill (2026-09-19)
+# Handover — PS2 frontend UI pass, batch 2 of 3 (2026-09-19)
 
-> Supersedes the 2026-09-18 handover, which covered the PR #1 backend review. That work is
-> done: PRs #1, #2 and #3 are merged. Its still-live gotchas are carried forward below.
+> Supersedes the earlier 2026-09-19 handover ("batches 1–3"). **Batch 1 is done and committed.**
+> That handover's corrections and gotchas sections are still accurate and are carried forward
+> below; its "Next steps" for batch 1 are complete.
 
 ## Goal
 
-Take over the frontend a teammate (Jettan17) built on `codex/frontend`, now merged to
-`main`, and get it to a state that survives judging: close the five open defects, then do
-the visual pass, then encode the direction as a skill so future contributors stay aligned.
+Execute **batches 2 and 3** of `PS2/PS2_DESIGN_REFINEMENT_PLAN.md` on `feat/ps2-frontend-fixes`.
+Batch 1 is finished. Batches 4–6 are deferred by the user. Keep writing
+`PS2/PS2_DESIGN_REFINEMENT_RESULTS.md` **as you go** — batch 1's section is already written; add
+batch 2's and 3's in the same shape.
 
-Context: NebulaX 2026 hackathon, Problem Statement 2 — Smart Commuter Companion. Persona
-is **Mdm Lim**: Bedok → Singapore General Hospital, fortnightly appointment, step-free,
-large text, lift-outage warning the evening before. Judged on a real phone browser.
+Context: NebulaX 2026 hackathon, Problem Statement 2 — Smart Commuter Companion. Persona is
+**Mdm Lim**: Bedok → Singapore General Hospital, fortnightly appointment, step-free, large text,
+lift-outage warning the evening before. Judged on a real phone browser.
 
 ## Status
 
-- `origin/main` is at `ebd1ab2` and **pushed**. Working tree clean except `.DS_Store`.
-- The frontend is merged and **runs against live LTA/OneMap data**, not fixtures.
-- Docs are reconciled — `PS2_INDEX.md` §0 ranks every document's authority, §11 records
-  every conflict and its resolution. **Read §0 before trusting any PS2 doc.**
-- Nothing in the five work items below has been started. No code has been changed this
-  session; all commits so far are documentation.
-
-History shape on `main` — two deliberate merges, authorship kept separate:
+- Branch `feat/ps2-frontend-fixes`, **9 commits, 3 of them unpushed**, tracking
+  `origin/feat/ps2-frontend-fixes`. Clean tree except the pre-existing untracked `.DS_Store`.
+- All five gates pass at `3981667`: `typecheck` (strict, now also covers `e2e/`), `lint`,
+  `test:run` (20 files / 52 tests), `build`, `test:e2e` (228 tests).
 
 ```
-ebd1ab2 docs(ps2): trace the map downscope to its origin in the frontend plan
-b88bcb3 Merge docs/reconcile-ps2: the frontend document reconciliation
-4afd7d2 Merge codex/frontend: the mobile journey companion   (13 commits, Jettan17)
+3981667 docs(ps2): record the batch 1 reflow evidence          ← this session
+4c00747 refactor(ps2-frontend): give each journey region its own grid area  ← this session
+c9b9e52 fix(ps2-frontend): stop a saved journey scrolling sideways          ← this session
+2ea24e8 docs(hoto): hand over the UI pass to a fresh session
+ce72edd fix(ps2-frontend): let a saved journey open offline
 ```
+
+**Batch 2 was designed and the design was presented, but never approved — the user asked for a
+handover instead of answering.** Re-present it (it is reproduced in full below) or just proceed;
+the three decisions it depended on were already answered and are binding (see Key decisions).
 
 ## Next steps
 
-Ordered. 1 is the cheapest real win; 4 must precede the UI pass or you redo the work.
+One coherent Conventional Commit per batch or smaller fix. Attribution line:
+`Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`. All paths under `PS2/frontend`.
 
-1. **Register the service worker.** `PS2/frontend/src/main.tsx` is bare — nothing imports
-   `virtual:pwa-register` or calls `navigator.serviceWorker.register`. So `src/sw.ts` and
-   the PWA manifest are dead code. Consequence: `navigator.serviceWorker.ready` at
-   `src/features/push/ReminderControls.tsx:29` never resolves, so "Enable reminders" hangs
-   forever for every user, and a cold load while offline fails with no cached shell.
-   `vite.config.ts` already configures `VitePWA` with `strategies: 'injectManifest'` and
-   `registerType: 'prompt'`, which *requires* an explicit `registerSW()` call. One call in
-   `main.tsx` unblocks both push and offline launch. Highest leverage in the codebase.
+### Batch 2 — establish the visual system (the approved design, verbatim)
 
-2. **Build the route map.** Decision is settled — see "Key decisions". Use **MapLibre GL JS
-   with free-tier vector tiles** (needs one provider signup for an API key; Protomaps or
-   MapTiler). No backend work required: `POST /api/trips` already returns
-   `map.bbox` and `map.geometry`, a GeoJSON `FeatureCollection` with one **mode-tagged**
-   `LineString` per leg (`{leg_id, mode}`). That `leg_id` tagging is exactly what the
-   brief's "affected portion distinguished from the unaffected portion" needs.
-   Known limit: the rail leg carries only 2 points, so it renders as a straight
-   Bedok→Outram line, not the true track alignment. Acceptable; note it, don't fake it.
+**Stylesheet structure.** Delete `global.css` and `native.css`; fold `feedback.css` in. Replace
+with one entry that makes cascade order explicit and gives every component exactly one owner:
 
-3. **Add automatic refresh.** There is no `setInterval`, visibility or reconnect refresh
-   anywhere. `src/features/journey/journeyCoordinator.ts` fetches status once on mount and
-   then only on a manual tap, while `statusFreshness` keeps reporting `'current'`
-   indefinitely. For a "leave by" tool that is a correctness bug, and it undercuts
-   *proactive*, one of the four scored words in the brief.
+```
+src/styles/index.css       @import the four, in order  ← App.tsx imports only this
+  tokens.css               every token, defined once
+  base.css                 reset, document, type scale, links, focus, reduced motion
+  layout.css               app shell, header, journey regions, reflow guards
+  components.css           one block per component
+```
 
-4. **Turn on `strict`.** No `strict` key exists in `tsconfig.json`, `tsconfig.app.json` or
-   `tsconfig.node.json`, so TypeScript defaults to `strict: false` and `strictNullChecks`
-   is off app-wide. Do this **before** the UI pass — it touches every file. Expect a pile
-   of errors on first enable. Compounding factor: every backend response schema uses
-   Pydantic `extra="allow"`, so `openapi-typescript` emits `& { [key: string]: unknown }`
-   on all 54 response types — meaning `tsc` will **not** catch a typo'd or renamed field on
-   any API response. Already exercised at `journeyCoordinator.ts:117-124`.
+**Tokens**, verbatim from the plan: canvas `#F4F5F0`, ink `#12271F`, secondary `#536259`, forest
+`#0D6048`, warm accent `#D8A35F`. Spacing 4/8/12/16/24/32/48. Gutter 16px at 320, 20px from 390.
+Max reading width ~42rem; secondary column only from 960px. Radius 16px controls / 24px primary
+surface. One shadow tier. 48px touch targets.
 
-5. **Fix the flaky test.** Observed once: `1 failed | 31 passed`. Did not reproduce in 13
-   subsequent runs, so the specific failing test was never captured. Mechanism not proven —
-   do not claim a root cause without reproducing it. Two candidates:
-   `src/features/planning/AppointmentForm.tsx:13` computes its default from the **real
-   clock** (`Date.now() + 24h`) and `AppointmentForm.test.tsx` installs **no fake timers**
-   (only `AsyncFeedback.test.tsx:10` and `api/client.test.ts:43` do); and
-   `src/components/AsyncFeedback.tsx:12` has a 5-second slow-request timer that the third
-   AppointmentForm test races against a never-resolving fetch.
+**Everything becomes rem-based.** It is almost entirely `px` today — that is the single change
+that makes text enlargement work, and it will make the existing 200%-text tests *stricter*
+rather than looser. Expect the responsive suite to surface new failures here; that is the suite
+doing its job, not a regression.
 
-Then, after the UI pass — **not before it**:
+**Type.** Manrope self-hosted (latin variable subset, 24 KiB woff2, weights 400–800,
+`font-display: swap`, tabular numerals) for the departure time and headings; system sans for body
+at 18px/1.5; supporting text ≥16px. Commit the OFL licence beside it.
+- CSS: `https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap` (send a
+  browser User-Agent or you get the legacy TTF sheet)
+- latin woff2: `https://fonts.gstatic.com/s/manrope/v20/xn7gYHE41ni1AdIRggexSvfedN4.woff2`
+  — **24,576 bytes, already verified**
+- licence: `https://raw.githubusercontent.com/google/fonts/main/ofl/manrope/OFL.txt` (the
+  `sharanda/manrope` repo paths 404)
 
-6. **Write the mobile UI skill** at `.claude/skills/ps2-mobile-ui/SKILL.md` (Claude Code
-   auto-loads `SKILL.md` from that layout; a loose `skills.md` is not picked up). It must
-   encode *decisions*, not generic mobile advice. The tokens already exist in
-   `PS2_DESIGN_REFINEMENT_PLAN.md` — inlined under "Key decisions" below so you do not have
-   to go find them. Write it *from* the UI pass so it describes what was actually built.
+**Surfaces.** One dominant dark departure surface, one lightly bordered status region, route
+diagram on the canvas, mostly borderless timeline. **Not every block a card.** Delete the
+decoration that competes with it: `.button-primary::after` sheen, `body::before` grid,
+`.journey-hero::before` circle and `::after` grid, `.status-panel::after` circle,
+`.hero-panel::before` bar, `.route-ticket::before` tab.
 
-## Key decisions & constraints
+**Behaviour changes the plan puts in batch 2, not just paint:**
+- Replace the `↻` glyph with a **labelled "Refresh" control**, moved into the status region
+  beside the checked-time. It currently lives in the hero as `.refresh-orb`.
+- Home must stop claiming readiness from an ID alone → neutral **"Open saved journey"**
+  (`App.tsx`, the `.appointment-preview` heading and the `.home-action` link).
+- Extract **`src/components/PageShell.tsx`** from `App.tsx`, with a contextual header naming each
+  screen and its back destination.
+- `AppointmentForm.tsx` must **require an explicitly chosen time** instead of defaulting to
+  tomorrow-at-this-minute (`futureSingaporeDateTime()`), keep errors tied to the right field, and
+  stop letting a network failure mark a valid date invalid.
 
-- **The route map is mandatory and in scope. Do not relitigate this.**
-  `PS2_DECISION_RECORD.md` §7.5 **D14 is titled "Never cut"** and its first item is
-  "Door-to-door route (step-free walks, EWL leg) on an OSM map with attribution"; its
-  fourth is "Visuals: affected route section shown by pattern and label". The brief,
-  `PS2_README.md` §3.2.3, requires "The route itself on a map, with the affected portion
-  clearly distinguished from the unaffected portion", and §3.2.4 caps a submission missing
-  any of 3.2.1–3.2.3 at **level 3** on the part of the score it covers.
-  Four documents had narrowed it away in four locally-reasonable steps (traced in
-  `PS2_INDEX.md` §11.2). Those are now annotated as withdrawn.
-- **Offline *tile caching* stays parked** — that is a genuine licensing constraint
-  (`PS2/backend/app/api/offline.py:81`) and the brief's quiet-feed allowance covers
-  shipping written steps offline. A parked tile pack is defensible to a judge; a missing
-  map is a scoring cap. Do not conflate the two again — that conflation is what caused this.
-- **OSM attribution is a licence breach if dropped, not a style point** — it caps the score.
-  The backend serves the strings; `src/features/journey/JourneyPage.tsx:37` renders them
-  today. Do not lose that in a UI rewrite.
-- **Basemap: MapLibre GL JS + free-tier vector tiles.** Chosen over Leaflet+raster (the
-  brief warns public tile servers "must not be hammered") and over a blank-canvas GeoJSON
-  render (arguably fails "on a map" and would not lift the cap).
-- **Visual direction of record** is `PS2_DESIGN_REFINEMENT_PLAN.md`. Its tokens, verbatim:
-  - Canvas `#F4F5F0`; ink `#12271F`; secondary `#536259`; forest `#0D6048`; warm accent
-    `#D8A35F`. Colour always accompanies text/icons; amber/red reserved for real warnings.
-  - Spacing scale 4/8/12/16/24/32/48px. Mobile gutter 16px at 320px, 20px from 390px.
-    Max reading width ~42rem; secondary column only from 960px.
-  - Body 18px/1.5, supporting text ≥16px, departure 56–72px tabular, headings 24–32px,
-    rem-based so text enlargement works. Manrope for headings, system sans for body.
-  - Radius 16px controls / 24px primary surface, one shadow tier, 48px touch targets.
-  - Motion: press 100ms, exit 140ms, enter 240ms, route reveal 420ms; entrance easing
-    `cubic-bezier(.22, 1, .36, 1)`, exit `cubic-bezier(.4, 0, 1, 1)`. Respect
-    `prefers-reduced-motion` (already honoured in all three stylesheets).
-- **`AGENTS.md` rule:** atomic Conventional Commits, one theme per commit, no scope mixing.
-- Commit attribution in use: `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
-- The app is **single-corridor by construction** — `destination_id: 'SGH'` is hardcoded at
-  `AppointmentForm.tsx:38` and enforced backend-side. That is intentional per the persona
-  decision, not a bug. General routing is Tasks 6–10 of `PS2_CONSOLIDATED_ROADMAP.md` and
-  is explicitly a separate programme.
+**Testing.** Add `e2e/a11y.spec.ts` — `@axe-core/playwright` and `axe-core` are **installed but
+have never been run**, so none of the a11y work here is verified by anything. Cover ready,
+pending, error and dialog states, plus explicit 48px touch-target measurement. Screenshots at
+320/390/1280 for all six screens via `npm run test:screens`, then **inspect them**.
+
+**Two things to flag rather than silently decide:** the warm accent `#D8A35F` is about 2.1:1 on
+the light canvas, so it fails WCAG AA as text — use it for non-text emphasis only and record
+that. And moving Refresh out of the hero changes that surface's composition, which batch 3
+rebuilds anyway.
+
+Gate: screenshots at 320 / 390 / desktop; verify 48px targets, contrast, large text, wrapping,
+one obvious primary action.
+
+### Batch 3 — rebuild the journey composition
+
+Files: `JourneyPage.tsx`, `RouteOverview.tsx`, `JourneyTimeline.tsx`, `JourneySkeleton.tsx`,
+`StatusPanel.tsx`.
+
+- **`RouteOverview.tsx` still needs the SVG rebuild.** Replace the uniform dots + joined
+  stop-name paragraph with a **responsive SVG route trace** with adjacent HTML labels tied to
+  nodes. Walking dotted, rail solid. Must handle zero/one/many legs, long names and missing
+  geometry, and **never require real map tiles**. Separate from the MapLibre map added in
+  `e395d94` — both are meant to exist; the map is the brief's §3.2.3 requirement, the SVG trace
+  is the always-works schematic. Reuse `legImpact.ts` so the diagram and the map agree on which
+  leg is affected.
+- Derive **short step titles** from structured `mode`/`from`/`to`/`line` fields. Do **not** parse
+  prose. Keep the original `instruction` as readable body text; exit, lift and safety details
+  stay exposed. Today `JourneyTimeline.tsx:17` puts the whole instruction paragraph in an `<h3>`.
+- **Restore `plan.summary.timing_basis`** in a labelled disclosure — the hero dropped it for
+  metrics. Uncertainty and safety warnings stay *outside* the disclosure.
+- `JourneyPage.tsx` still does `plan.summary.leave_by_label.replace(/^Leave at\s*/i, '')` —
+  a regex stripping English copy as a time parser. Keep the full backend label accessible and
+  stop relying on this.
+- Gate: ready / stale / warning / no-overview / failed-replan screenshots; no information lost;
+  no retained plan falsely presented as confirmed.
+
+## Key decisions & constraints — do not relitigate
+
+**Decided this session by the user (2026-09-19):**
+- **Full stylesheet restructure**, not a minimal token-only diff. Because `native.css` stacks
+  three passes that each override the one before, and batch 3 builds directly on it.
+- **Self-host Manrope.** It came in at 24 KiB against the plan's 60 KiB budget, which was the
+  plan's own condition for using it rather than falling back to system fonts.
+- **No checkpoint between batches 2 and 3.** Run them back to back, commit separately, report
+  once at the end.
+
+**Carried forward, still binding:**
+- **The route map is mandatory and in scope.** `PS2_DECISION_RECORD.md` §7.5 D14 is titled
+  "Never cut"; `PS2_README.md` §3.2.3 requires the route on a map with the affected portion
+  distinguished, and §3.2.4 caps a submission missing it at **level 3**. The map-exclusion line
+  inside `PS2_DESIGN_REFINEMENT_PLAN.md` is annotated as **withdrawn**; the rest of that plan
+  (tokens, spacing, typography, composition, motion) remains current.
+- **Basemap is OneMap raster, not MapLibre vector tiles.** SLA serves it free for Singapore, no
+  signup, no API key to mint before a demo, and the backend already talks to OneMap. Endpoint
+  `https://www.onemap.gov.sg/maps/tiles/Grey/{z}/{x}/{y}.png`, no token. Grey over Default —
+  Default fights the route overlay.
+- **Offline *tile caching* stays parked** (licensing, `PS2/backend/app/api/offline.py:81`).
+  A parked tile pack is defensible; a missing map is a scoring cap. Do not conflate them.
+- **OSM attribution is a licence breach if dropped**, not a style point. `JourneyPage.tsx`
+  renders the backend strings in `.journey-actions`; the map adds OneMap/SLA separately.
+  **Do not lose either in a UI rewrite.**
+- **Single-corridor by construction** — `destination_id: 'SGH'` hardcoded in
+  `AppointmentForm.tsx` and enforced backend-side. Intentional, not a bug.
+- **Backend is fine and out of scope.** Live LTA + OneMap data, PRs #1–#3 merged.
+- Batch 6's **≤5 KiB added compressed JS** budget: MapLibre is 279 KiB gzip — justified by
+  D14/§3.2.3, code-split and precache-excluded, but it **must be recorded** in
+  `PS2_DESIGN_REFINEMENT_RESULTS.md`, not quietly ignored. Manrope's 24 KiB is a font, not JS,
+  and has its own 60 KiB budget.
 
 ## Gotchas / learnings
 
-- **The teammate's own review already listed the worst bugs and nobody read it.**
-  `PS2_FRONTEND_REVIEW.md` (27 lines, written at 00:56 on the first frontend commit) has
-  the service-worker hang as finding 5 and the missing auto-refresh as finding 4. They were
-  known within an hour of starting and never closed. Check that file before re-deriving.
-- **"Completed" in `PS2_UX_POLISH_RESULTS.md` is not evidence.** The doc written 38 minutes
-  later says so explicitly. The branch head is a *specification*, not a shipped increment —
-  its required completion artefact `PS2_DESIGN_REFINEMENT_RESULTS.md` does not exist.
-- **`PS2/references/` was found moved into `PS2/frontend/references/`** mid-session by
-  something outside this session; restored. If it happens again: the six organiser files
-  (problem statement, DataMall guides, weather specs) belong at `PS2/references/`, and
-  `PS2_INDEX.md` §1 (sources S1–S9) and `PS2_README.md` both cite that path.
-- **Check which branch you are on before editing.** The checkout was switched to
-  `codex/frontend` mid-session by something outside this session, which is why
-  `PS2/frontend/` existed to run. It is all merged to `main` now, but verify.
-- **Playwright needs a browser binary**: `npx playwright install chromium --with-deps`
-  before `npm run test:e2e`. Not in the frontend README's verification section.
-- **`jsx-a11y` and `axe-core` are installed but never run.** The linter is `oxlint` and
-  `.oxlintrc.json` enables only `react`/`typescript`/`oxc`; the single Playwright spec
-  (`e2e/home.spec.ts`) does not import `AxeBuilder`. So none of the genuinely good a11y
-  work in this codebase is automatically verified.
-- **No error boundary exists anywhere** — any render throw white-screens the whole app.
-- **`api:generate` needs a live backend**: it runs `openapi-typescript` against
-  `http://127.0.0.1:8000/openapi.json`. Nothing checks `generated.d.ts` for staleness, so
-  a backend schema change desyncs silently. It is current as of `ebd1ab2`.
-- **OneMap token is a 3-day JWT.** The one in `PS2/.env` expires **2026-09-22 10:53 SGT**
-  and will need re-minting. The LTA key was pasted into a chat transcript — worth rotating
-  after the event.
-- Carried forward from the backend session, still true:
-  - Fixtures are **rewritten at runtime** (`app/sources/base.py:_record`), which dirties the
-    git tree during tests. Monkeypatch `Source._record` or point `app.config.FIXTURES` at
-    a temp dir.
-  - `PS2_USE_FIXTURES=1` is **not** a hard offline switch — a missing fixture still hits the
-    network, and `app/sources/onemap.py` ignores the flag entirely.
-  - `data/derived/stepfree_graph.json` is 4.9 MB and its `built_at` changes on every
-    rebuild; avoid re-running `scripts/build_data.py` without reason.
-  - `gh` CLI is authenticated for this repo.
+### From this session
+
+- **The e2e route glob `**/api/**` also matches the dev server's own `/src/api/*.ts` modules**
+  and answers them with JSON, which silently breaks the page before React boots — 121 tests
+  "failed" for this reason before I spotted it. `mockApi.ts` now matches on
+  `url.pathname.startsWith('/api/')`. Do not go back to a glob.
+- **Releasing a `white-space: nowrap` chip from its automatic minimum makes reflow worse.**
+  `min-inline-size: 0` on `.time-delta` shrank it to 48px while its text stayed 109px, spilling
+  across the page and regressing two previously-passing tests. Nowrap chips need
+  `flex: none` and a wrapping parent instead. Same applies to `.journey-date`, `.route-chip` and
+  the section-heading link.
+- **`grid-area: <name>` with no matching `grid-template-areas` silently stacks every region on
+  top of the others** — the browser creates implicit lines with that name. The mobile
+  single-column area map in `global.css` is load-bearing, not decorative.
+- **Typing the e2e fixtures immediately caught four fabricated payload shapes** (`Disruption`,
+  `TripMap`, `NotOffered`). `e2e/` sat outside every tsconfig project until `tsconfig.e2e.json`
+  was added. Keep it referenced from `tsconfig.json`.
+- **Playwright runs the responsive suite on one worker** regardless of `--workers=N`, because
+  `fullyParallel` is not set and the tests live in one file. 228 tests take ~65s. Do not assume
+  a hung run.
+- **The screenshot spec asserts nothing**, so it is its own Playwright project (`screens`) and is
+  excluded from `npm run test:e2e`. Run it with `npm run test:screens`. Output goes to
+  `PS2/evidence/screens/<width>/` and is **gitignored**, not committed.
+- **In the screenshot harness the route map shows its loading fallback**, because `mockApi`
+  aborts all OneMap tile requests so a slow tile server cannot be mistaken for a layout fault.
+  That is the harness, not a bug — but it means screenshots cannot prove the map renders. Verify
+  the map separately against the live backend.
+- The warm accent `#D8A35F` is roughly **2.1:1 on the `#F4F5F0` canvas** — fails WCAG AA for
+  text. Non-text emphasis only.
+
+### Carried forward
+
+- **There is still no error boundary anywhere except around the map.** This already caused one
+  white screen: offline, the non-precached map chunk's dynamic import rejects and the throw
+  blanked the whole page, wiping the written steps she saved for exactly that moment. Fixed in
+  `ce72edd` with a boundary in `RouteMapPanel.tsx` and by skipping the map for
+  `snapshot.source === 'saved'`. **Any new lazy import or render throw in batches 2–3 has the
+  same failure mode.** Consider a top-level boundary. This is also why
+  `formatSingaporeDateTime` now returns an unparseable value instead of letting `Intl` throw.
+- **Assert durable outcomes, not transient ones, in tests.** A previous flake was an assertion on
+  a loading skeleton that disappears when the mocked fetch settles. Batch 3 touches
+  `JourneySkeleton.tsx`; this bites again there.
+- `journeyCoordinator.ts` is good code — a hand-rolled observable with a `generation` counter
+  that correctly discards stale async responses. **Build on it, do not replace it.** Batch 4
+  warns: do not key/remount `JourneyProvider` for visual transitions or you cause duplicate
+  network requests.
+- **Three MapLibre failures that report no error at all**, all fixed in `e395d94`: MapLibre
+  mutates the style object it is handed (build a fresh style per instance); its worker must be
+  imported with **`?worker&url`**, not `?url`; and `vite preview` does not inherit `server.proxy`
+  (`preview.proxy` now added). Symptom: `map.isStyleLoaded()` stays `false` while layers exist.
+- **Backend response schemas use Pydantic `extra="allow"`**, so `openapi-typescript` emits an
+  index signature on all 54 response types. `tsc` will **not** catch a typo'd or renamed field on
+  any API response, even with strict on. `plan.replan_failed` is one such undeclared field.
+- **OneMap token is a 3-day JWT — expires 2026-09-22 10:53 SGT** and will need re-minting. The
+  LTA key was pasted into a chat transcript; worth rotating after the event.
+- The Chrome extension (`mcp__claude-in-chrome__*`) is **not connected**. Use Playwright; it
+  works well and gives reproducible evidence. Headless WebGL needs
+  `--use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader`.
+- Node scripts run from `/tmp` cannot resolve `node_modules`; run throwaway Playwright scripts
+  from inside `PS2/frontend` and delete them.
+- Fixtures are **rewritten at runtime** (`app/sources/base.py:_record`), dirtying the git tree
+  during backend tests. `PS2_USE_FIXTURES=1` is **not** a hard offline switch.
+- `api:generate` needs a live backend on `:8000`; nothing checks `generated.d.ts` for staleness.
 
 ## Important files
 
-- `PS2/PS2_INDEX.md` — **start here.** §0 is the document authority ranking, §11 is the
-  full reconciliation (§11.2 = the map, §11.4 = open defects, §11.5 = live validation).
-- `PS2/PS2_FRONTEND_REVIEW.md` — 7 open functional findings from the teammate. The work list.
-- `PS2/PS2_DESIGN_REFINEMENT_PLAN.md` — visual direction of record; tokens, composition,
-  motion. Its map-exclusion line is annotated as withdrawn.
-- `PS2/PS2_DECISION_RECORD.md` — D1–D14, persona rationale, privacy draft. **Binding.**
-- `PS2/PS2_README.md` — the organisers' brief and rubric. **Outranks everything in repo.**
-- `PS2/frontend/src/features/journey/journeyCoordinator.ts` — 206 lines, the core state
-  machine. Hand-rolled observable with a `generation` counter that correctly discards stale
-  async responses. Good code; build on it, don't replace it.
-- `PS2/frontend/src/main.tsx` — where the missing `registerSW()` goes (step 1).
-- `PS2/frontend/vite.config.ts` — PWA config and the `/api` → `:8000` dev proxy.
-- `.claude/pr1-review-findings.md` — 34 indexed backend findings from PR #1 (now merged).
-- `.claude/repro/` — 47 scripts reproducing those findings, with a README mapping them.
+**The spec and its authorities**
+- `PS2/PS2_DESIGN_REFINEMENT_PLAN.md` — **the spec for this work.** 179 lines. Batches at
+  §"Bounded implementation batches"; tokens at §"Design direction"; target wireframe at
+  §"Target composition"; motion table (batch 4, deferred) at §"Motion specification".
+- `PS2/PS2_INDEX.md` — §0 ranks every document's authority, §11 records every conflict and its
+  resolution. **Read §0 before trusting any PS2 doc.**
+- `PS2/PS2_README.md` — organisers' brief and rubric. **Outranks everything in repo.**
+- `PS2/PS2_DECISION_RECORD.md` — D1–D14. **Binding.**
+- `PS2/PS2_FRONTEND_REVIEW.md` — 7 findings. **#2 and #4 closed**; #5 and #7 partial;
+  **#1, #3, #6 still open** (two are High). Not in scope for 2–3 but do not regress them.
+
+**Written this session**
+- `PS2/PS2_DESIGN_REFINEMENT_RESULTS.md` — batch 1 section complete: reproduction, measured root
+  cause, the desktop re-placement numbers, gate output, honest limitations. **Append to this.**
+- `PS2/frontend/e2e/fixtures/payloads.ts` — frozen API payloads captured from the live backend,
+  959 lines. Trip id `t_fixture000000000000001`, observed-at stamps frozen to 09:05.
+- `PS2/frontend/e2e/fixtures/states.ts` — the named states derived from those payloads
+  (`statusStale`, `statusDisrupted`, `planLongNames`, `planNoOverview`, `savedBundle`, …).
+- `PS2/frontend/e2e/fixtures/mockApi.ts` — route interception + IndexedDB seeding.
+- `PS2/frontend/e2e/fixtures/overflow.ts` — reports the offending element, its box, its computed
+  width and its layout ancestor. Reuse it rather than writing a new probe.
+- `PS2/frontend/e2e/responsive.spec.ts` — 221 tests, 17 states × 10 widths + 200% text.
+- `PS2/frontend/e2e/journey-layout.spec.ts` — region placement stability.
+- `PS2/frontend/e2e/screenshots.spec.ts` — capture only, project `screens`.
+
+**To be rewritten in batches 2–3**
+- `PS2/frontend/src/App.tsx` — `PageShell` is defined inline here; batch 2 extracts it.
+- `PS2/frontend/src/styles/` — `tokens.css` (18 lines), `global.css` (~100), `native.css` (~117),
+  `feedback.css` (9). The override tangle batch 2 replaces.
+- `PS2/frontend/src/features/journey/RouteOverview.tsx` — the schematic batch 3 replaces.
+- `PS2/frontend/src/features/journey/legImpact.ts` — maps status onto legs. Reuse it for the SVG
+  trace so the diagram and the map agree.
+- `PS2/frontend/src/features/planning/AppointmentForm.tsx` — the default-time and error-binding
+  changes batch 2 needs.
+
+## Relevant memory (inlined — these do NOT auto-reload after /compact)
+
+Memory was empty at the start of this session; two files were written. Verbatim:
+
+> **`ps2-design-batch2-direction.md`** (type: project)
+> On 2026-09-19 the user chose, for batch 2 of `PS2/PS2_DESIGN_REFINEMENT_PLAN.md`:
+> 1. **Full stylesheet restructure**, not a minimal token-only diff. `global.css` and
+>    `native.css` are to be replaced by `tokens.css` / `base.css` / `layout.css` /
+>    `components.css` behind a single `index.css`, with exactly one owner per component.
+> 2. **Self-host Manrope** — latin variable subset, 24 KiB woff2, OFL licence committed. Used for
+>    the departure time and headings only; system sans for body.
+> 3. **No checkpoint between batches 2 and 3** — run them back to back, commit separately,
+>    report once at the end.
+>
+> **Why:** `native.css` stacks three passes that each override the one before, so any further
+> decoration on top is unmaintainable, and batch 3 builds directly on it. The font came in well
+> under the plan's 60 KiB budget, which was the plan's own condition for using it rather than
+> falling back to system fonts.
+>
+> **How to apply:** treat these three as settled; do not re-ask. Batches 4–6 remain deferred.
+
+> **`ps2-user-prefers-options-with-a-recommendation.md`** (type: feedback)
+> The user opens sessions with instructions like "read handover and get to work!" and answers
+> multi-part decision prompts in one pass without hesitation. When offered a checkpoint between
+> two batches of work they declined it and said to carry straight on.
+>
+> **Why:** they are executing a plan they already wrote and reviewed; the decisions they want are
+> the ones the plan genuinely leaves open (a budget, a risk appetite, a trade-off), not
+> confirmation that the plan should be followed.
+>
+> **How to apply:** batch the genuinely-open decisions into one prompt, lead each option with a
+> recommendation and the fact behind it, then execute without further check-ins. Do not ask
+> "shall I proceed?" between steps.
 
 ## Verification
 
-Environment is already provisioned — venv (Python 3.14.5) and 390 npm packages are
-installed, `PS2/.env` exists with live LTA + OneMap keys and VAPID pair, and is gitignored.
+Environment is provisioned — venv (Python 3.14.5), npm packages installed, `PS2/.env` has live
+LTA + OneMap keys and a VAPID pair, gitignored. Playwright's `chromium-1243` is already in
+`~/Library/Caches/ms-playwright/`; no `npx playwright install` needed.
 
-Start both services (two terminals, from repo root):
+**The backend was running on :8000 during this session** and answered `/api/health` with
+`fixtures_only: false` and both credentials `true`. A Playwright dev server may still be on
+:5173. Start fresh ones on other ports rather than trusting these to be alive.
 
 ```bash
-cd PS2/backend && ../backend/.venv/bin/python -m uvicorn app.main:app --reload --port 8000
-cd PS2/frontend && npm run dev          # :5173, proxies /api to :8000
+cd PS2/backend && ./.venv/bin/python -m uvicorn app.main:app --reload --port 8000
+cd PS2/frontend && npm run dev            # proxies /api to :8000
+curl -s localhost:8000/api/health         # expect fixtures_only:false, both credentials true
 ```
 
-Confirm the stack is live, not fixtures:
+Gates — all five passed at `3981667`, tree unchanged since:
 
 ```bash
-curl -s localhost:8000/api/health
-# expect: {"ok":true,"stations":186,"credentials":{...:true,...:true},"fixtures_only":false}
-
-curl -s -X POST localhost:8000/api/trips -H 'content-type: application/json' \
-  -d '{"appointment_at":"2026-09-20T10:30:00+08:00"}'
-# expect: 3 legs Bedok→SGH, step-free lift instruction on leg 3, map.geometry populated
-```
-
-Frontend gates, from `PS2/frontend` — all four passed at `ebd1ab2`:
-
-```bash
-npm run typecheck     # exit 0
+cd PS2/frontend
+npm run typecheck     # exit 0; strict; now covers e2e/ via tsconfig.e2e.json
 npm run lint          # oxlint, silent on success
-npm run test:run      # 15 files, 32 tests  (see flake note, step 5)
-npm run build         # ~296 kB / 92 kB gzip; PWA precache 6 entries
-npm run test:e2e      # needs: npx playwright install chromium --with-deps
+npm run test:run      # 20 files, 52 tests
+npm run build         # precache 6 entries (318.60 KiB)
+npm run test:e2e      # 228 tests, ~65s, single worker
+npm run test:screens  # capture only → PS2/evidence/screens/<width>/, gitignored
 ```
 
-Per-step checks:
+The e2e suite is the regression net for batches 2 and 3. **Expect the 200%-text tests to fail
+once type goes rem-based** — that is the suite getting stricter, and those failures are real
+reflow to fix, not noise.
 
-- **Step 1 done** when `navigator.serviceWorker.ready` resolves in a production build
-  (`npm run build && npm run preview`), "Enable reminders" completes instead of hanging,
-  and a reload with DevTools offline still serves the shell. Dev mode is not sufficient
-  evidence — `injectManifest` behaves differently there.
-- **Step 2 done** when the route renders on tiles with the affected leg visually distinct
-  from unaffected ones, OSM attribution visible, and it reflows at 320px with no horizontal
-  scroll. Drive it with the `/demo` scenario switches (`VITE_ENABLE_DEMO=true`) to force a
-  disruption and confirm the affected leg actually changes appearance.
-- **Step 4 done** when `npm run typecheck` exits 0 *with* `"strict": true` in
-  `tsconfig.app.json`.
-- **Step 5 done** when you have *reproduced* the failure, not merely seen green. Loop it:
-  `for i in $(seq 1 30); do npx vitest run --reporter=basic || break; done`.
+Additionally:
 
-Do not claim any of these passed without pasting the actual command output.
+- **Do not claim a fix without the measurement.** `e2e/fixtures/overflow.ts` prints the offending
+  element and its computed size; paste it.
+- **Inspect screenshots, do not just generate them** — clipped controls, crowding, inconsistent
+  alignment, unexplained empty space. Known and unfixed as of `3981667`: full instruction
+  paragraphs used as bold headings, the joined stop-name paragraph, and empty space below the
+  desktop second column. Batches 2–3 address all three.
+- Verify the production build separately where the service worker is involved; dev-server checks
+  do not establish production offline behaviour. Regression check for `ce72edd`: with the network
+  disabled, a cold load of `/trip/:id` must return 200 and show the departure time, the
+  offline-copy notice and the written steps, with **zero page errors**.
+- Do not claim any of these passed without pasting the actual command output.

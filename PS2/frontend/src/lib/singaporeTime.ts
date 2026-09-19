@@ -22,10 +22,31 @@ export function singaporeDateTimeToIso(value: string) {
 }
 
 export function formatSingaporeDateTime(value: string) {
+  const parsed = new Date(value)
+  // Intl throws on an invalid date. The screens that call this include the saved journey read
+  // back with no network, where a throw would blank the written steps rather than show a stamp.
+  if (Number.isNaN(parsed.getTime())) return value
   return new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'long',
     timeStyle: 'short',
     hourCycle: 'h23',
     timeZone: 'Asia/Singapore',
-  }).format(new Date(value))
+  }).format(parsed)
+}
+
+/**
+ * The clock face alone, for the departure lockup where the surrounding copy already says
+ * what the number is. Derived from the ISO instant rather than by stripping English words
+ * off the backend's label, which would break the moment that label is reworded or localised.
+ * Returns null when the value cannot be parsed, so the caller can fall back to the label.
+ */
+export function formatSingaporeClock(value: string) {
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: 'Asia/Singapore',
+  }).format(parsed)
 }

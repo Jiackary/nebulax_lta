@@ -117,7 +117,7 @@ export class JourneyCoordinator {
         phase: status?.replan_failed || plan.replan_failed ? 'degraded' : 'ready', operation: 'idle',
         snapshot: {
           tripId, plan, status, receivedAt: bundle.generated_at, source: 'network',
-          routeConfirmed: Boolean(status) && !status.replan_failed && !plan.replan_failed,
+          routeConfirmed: status !== null && !status.replan_failed && !plan.replan_failed,
           statusFreshness: status ? (status.stale ? 'stale' : 'current') : 'unavailable',
           warnings: bundle.warnings,
         },
@@ -133,6 +133,14 @@ export class JourneyCoordinator {
       }
       throw error
     }
+  }
+
+  // A check that succeeded ten minutes ago is not a current check. Without this the panel
+  // keeps saying "Checked 09:14" in the present tense for as long as the screen is open.
+  markStale() {
+    const snapshot = this.state.snapshot
+    if (!snapshot || snapshot.statusFreshness !== 'current') return
+    this.publish({ ...this.state, snapshot: { ...snapshot, statusFreshness: 'stale' } })
   }
 
   private async refreshCurrent() {

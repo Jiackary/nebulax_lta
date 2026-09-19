@@ -1,4 +1,4 @@
-# Nusa Journey Companion frontend
+# Wobble Journey Companion frontend
 
 Mobile-first React PWA for the fixed Bedok → Singapore General Hospital journey. The backend remains the authority for route planning, timings, accessibility assessment, disruptions and alternatives.
 

@@ -14,20 +14,20 @@ const status = {
 
 describe('StatusPanel', () => {
   it('qualifies a stale all-clear as last reported', () => {
-    render(<StatusPanel status={status as never} routeConfirmed />)
+    render(<StatusPanel status={status as never} routeConfirmed onRefresh={() => {}} refreshing={false} />)
 
     expect(screen.getByText(/last reported status/i)).toBeVisible()
     expect(screen.getByText(/your usual route is clear/i)).toBeVisible()
   })
 
   it('puts the unsafe retained-route warning ahead of a failed replan', () => {
-    render(<StatusPanel status={{ ...status, replan_failed: true } as never} routeConfirmed={false} />)
+    render(<StatusPanel status={{ ...status, replan_failed: true } as never} routeConfirmed={false} onRefresh={() => {}} refreshing={false} />)
 
     expect(screen.getByText(/previous plan.*may not be usable/i)).toBeVisible()
   })
 
   it('does not present retained all-clear status as current after a failed refresh', () => {
-    render(<StatusPanel status={{ ...status, stale: false } as never} routeConfirmed={false} statusFreshness="failed" />)
+    render(<StatusPanel status={{ ...status, stale: false } as never} routeConfirmed={false} statusFreshness="failed" onRefresh={() => {}} refreshing={false} />)
 
     expect(screen.getByText(/could not be updated/i)).toBeVisible()
     expect(screen.getByText(/directions below have not been confirmed/i)).toBeVisible()
