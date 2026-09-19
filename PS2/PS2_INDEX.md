@@ -6,13 +6,37 @@ to the source instead of re-reading the pack. Nothing here is a design decision 
 what the organisers said, plus what was measured directly from the provided files.
 
 **Status:** backend built and under review. Stages 1–9 of `PS2_BACKEND_PLAN.md` §9 are
-`done`; the frontend has not been started. The 34 findings of the PR #1 review are
-reconciled — see that PR and `PS2_API_CONTRACT.md` §10 for what changed.
+`done`. **The frontend exists** — a React/Vite PWA on branch `codex/frontend`, 13 commits,
+typecheck/lint/32 tests/build all passing. It is a functional first slice, not a finished
+product: see §11 for what is open. The 34 findings of the PR #1 review are reconciled —
+see that PR and `PS2_API_CONTRACT.md` §10 for what changed.
 **Compiled:** 2026-09-17, against repo commit `16526c0` (clean tree).
 **Revised:** 2026-09-18, after the PR #1 review pass.
+**Revised:** 2026-09-19, after the frontend branch landed and the docs were reconciled (§11).
 **Repo root:** the checkout containing this `PS2/` directory. Paths below are relative to
 `PS2/` unless prefixed with `../`; no absolute path is recorded here, because the one that
 used to be (a `/home/...` developer path) was true only on one machine.
+
+---
+
+## 0. Which document is current
+
+Eight frontend documents were written on 19 Sep within eight hours. They overlap and in
+one place contradict each other. Read in this order; do not treat the others as direction.
+
+| Doc | Authority | Read it for |
+|---|---|---|
+| `PS2_DECISION_RECORD.md` | **Binding.** Accepted 17 Sep. | The persona, D1–D14. **D14 is a "never cut" list and it outranks any later frontend doc.** |
+| `PS2_README.md` | **Binding.** Organisers'. | The brief and the rubric. Wins over everything in this repo. |
+| `PS2_API_CONTRACT.md` | Current | What the backend serves. `/openapi.json` is machine truth. |
+| `PS2_ARCHITECTURE.md` | Current | What the code actually is today. |
+| `PS2_DESIGN_REFINEMENT_PLAN.md` | Current **except its scope line** — see §11.2 | Visual direction, tokens, spacing, typography. |
+| `PS2_FRONTEND_REVIEW.md` | Current | 7 open functional findings. Findings 4 and 5 are still open and are the two worst live bugs. |
+| `PS2_CONSOLIDATED_ROADMAP.md` | Current, **incomplete** — see §11.3 | Tasks 1–10. Contains no map task; one is missing. |
+| `PS2_UX_POLISH_PLAN.md` | **Superseded** for visual/motion by the design refinement plan. Its state-coherence requirements still stand. | History. |
+| `PS2_UX_POLISH_RESULTS.md` | **Qualified** — see §11.1 | History. Its "Completed" claim is not evidence. |
+| `PS2_FRONTEND_PLAN.md` | Historical | The original plan. Says "Implementation has not started"; it has. |
+| `PS2_READ_ALOUD_HANDOFF.md` | Scope only | Not implemented. Its own text says it is not an implementation spec. |
 
 ---
 
@@ -421,3 +445,101 @@ Independent UX review, wireframes, and smaller-model polish handoff: [PS2_UX_POL
 | How the backend is built, and what's wrong with the record | `PS2_BACKEND_PLAN.md` |
 | What the API serves the frontend | `PS2_API_CONTRACT.md` |
 | Which backend stages are done | `PS2_BACKEND_PLAN.md` §9 — update it as you build |
+
+---
+
+## 11. Frontend doc reconciliation — 19 Sep 2026
+
+Eight frontend documents were written on 19 Sep between 00:56 and 09:31. Nothing below
+deletes any of them; this section records where they disagree and which one wins.
+
+### 11.1 "Completed" is not a completion claim
+
+`PS2_UX_POLISH_RESULTS.md` (08:53) opens "Completed 19 September 2026" with a green
+validation table. `PS2_DESIGN_REFINEMENT_PLAN.md` (09:31, 38 minutes later) reviews the
+same code and says it is "a styled prototype, not yet the polished mobile product",
+adding: "the results document is not evidence that every earlier item was completed."
+
+**Resolution.** The later review stands. Treat the results doc as a record of what was
+attempted, not of what shipped. Its required completion artefact,
+`PS2_DESIGN_REFINEMENT_RESULTS.md`, does not exist — the branch head is a specification,
+not a shipped increment.
+
+One claim in it *is* now outdated in our favour: it records "the development server was
+started in fixture mode, which... does not validate live external LTA/OneMap data."
+That has since been done — see §11.4.
+
+### 11.2 The route map was scoped out in contradiction of D14
+
+`PS2_DESIGN_REFINEMENT_PLAN.md` states "geographic maps remain outside this frontend
+pass." `PS2_UX_POLISH_RESULTS.md` files map tiles under "optional future work."
+
+Both contradict an accepted decision. `PS2_DECISION_RECORD.md` §7.5 **D14 is titled
+"Never cut"**, and its first item is "Door-to-door route (step-free walks, EWL leg) **on
+an OSM map with attribution**"; its fourth is "Visuals: affected route section shown by
+pattern and label". The map appears nowhere on the cut list below it.
+
+The brief agrees. `PS2_README.md` §3.2.3 requires "The route itself on a map, with the
+affected portion clearly distinguished from the unaffected portion", and §3.2.4 caps a
+submission missing any of 3.2.1–3.2.3 at level 3 on the part of the score it covers.
+
+**How the error happened.** Two different things were conflated. Backend issue I6 parked
+*offline tile caching* for a real licensing reason — `backend/app/api/offline.py:81`
+returns "No tile provider whose terms permit offline caching has been chosen." That
+narrow parked item was widened into "no maps". `PS2_UX_POLISH_PLAN.md` then deferred the
+map to `PS2_CONSOLIDATED_ROADMAP.md` ("Those programmes remain in..."), but that roadmap's
+ten tasks contain no map task. It fell through the gap between two documents.
+
+**Resolution.** D14 stands; the map is in scope. Offline tile caching stays parked — the
+brief's quiet-feed allowance covers shipping written steps offline, and `offline.py`
+already returns an honest `unavailable_reason`. A *parked* offline tile pack is
+defensible to a judge; a missing map is a scoring cap.
+
+**This is cheaper than the docs imply.** The backend already serves the geometry today:
+`POST /api/trips` returns `map.bbox` and `map.geometry`, a GeoJSON `FeatureCollection`
+with one mode-tagged `LineString` per leg (`{leg_id, mode}`). The `leg_id` tagging is
+precisely what the affected/unaffected distinction needs. No backend work is required.
+Known limitation: the rail leg carries two points, so it renders as a straight line
+rather than the true track alignment.
+
+Chosen basemap: **MapLibre GL JS with free-tier vector tiles.** OSM attribution is a
+licence cap, not a style point — the backend serves the strings and
+`JourneyPage.tsx:37` renders them today. Do not lose that in a UI rewrite.
+
+### 11.3 The roadmap is missing a task
+
+`PS2_CONSOLIDATED_ROADMAP.md` §8 sequences Tasks 1–10 and none of them is the route map.
+A map task needs adding before that roadmap is treated as complete.
+
+### 11.4 Known-open functional findings
+
+`PS2_FRONTEND_REVIEW.md` (00:56) recorded seven findings and they were never closed.
+Two were independently re-confirmed against the code on 19 Sep and are the worst:
+
+- **Finding 5 — the service worker is never registered.** Nothing in `src/` imports
+  `virtual:pwa-register` or calls `navigator.serviceWorker.register`. `src/sw.ts` and the
+  PWA manifest are therefore dead code. `ReminderControls.tsx:29` awaits
+  `navigator.serviceWorker.ready`, which never resolves, so "Enable reminders" hangs for
+  every user, and a cold load while offline fails with no cached shell. One missing call
+  gates both push and offline launch.
+- **Finding 4 — no automatic refresh.** No interval, visibility or reconnect refresh
+  exists. Status is fetched once on mount and thereafter only on a manual tap, while
+  `statusFreshness` continues to report `current`. For a "leave by" tool this is a
+  correctness risk and it undercuts *proactive*, one of the four scored words.
+
+Also open and unverified by tooling: `eslint-plugin-jsx-a11y` and `axe-core` are
+installed but never run (the linter is `oxlint`; the one Playwright spec does not import
+axe), and `strict` is absent from every `tsconfig`, so `strictNullChecks` is off.
+
+### 11.5 Live validation, 19 Sep 2026
+
+Previously only fixture mode had been exercised. Both services were run against real
+credentials from this checkout:
+
+- `GET /api/health` → `{"ok": true, "stations": 186, "fixtures_only": false}`, both
+  credentials recognised.
+- `POST /api/trips` → a real Bedok → SGH plan, three legs, step-free lift instruction on
+  the final leg, with `map.geometry` populated from OSM-routed walking paths.
+- Frontend dev server on :5173 with the `/api` proxy resolving to the live backend.
+
+The OneMap token is a three-day JWT and will need re-minting; `PS2/.env` is gitignored.

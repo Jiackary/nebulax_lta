@@ -1,5 +1,13 @@
 # PS2 Product and Technical Completion Plan
 
+> **Incomplete — reconciled 19 Sep 2026; see `PS2_INDEX.md` §11.3.**
+> `PS2_UX_POLISH_PLAN.md` deferred the route map to this document ("Those programmes
+> remain in `PS2_CONSOLIDATED_ROADMAP.md`"), but §8 below sequences Tasks 1–10 and none
+> of them is the map. It is a mandatory capability under `PS2_README.md` §3.2.3 and a
+> "never cut" item under `PS2_DECISION_RECORD.md` D14. A map task must be added before
+> this roadmap is treated as a complete plan. Tasks 1–4 correspond to open findings in
+> `PS2_FRONTEND_REVIEW.md`; findings 4 and 5 there are the two worst live bugs.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the current Bedok-to-SGH specialist prototype into a production-ready mobile companion, add safe user-triggered read-aloud guidance, and make an explicit product decision about broader station and destination support.

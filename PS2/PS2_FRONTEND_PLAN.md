@@ -1,5 +1,13 @@
 # PS2 Frontend Implementation Plan
 
+> **Historical — reconciled 19 Sep 2026; see `PS2_INDEX.md` §0 and §11.**
+> Implementation *has* started: the frontend exists on `codex/frontend`. The line below
+> saying otherwise predates it. For current direction use `PS2_DESIGN_REFINEMENT_PLAN.md`
+> (visual) and `PS2_FRONTEND_REVIEW.md` (open functional findings). Note that the stack
+> stated below specifies "TypeScript strict mode" and axe-core; neither is actually in
+> effect in the built code — `strict` is absent from every `tsconfig` and axe is never
+> run. See `PS2_INDEX.md` §11.4.
+
 > For agentic workers: use the executing-plans skill to implement one task at a time. Use the checkboxes to track progress. Do not implement this entire document in one turn. Implementation has not started.
 
 **Goal:** Build a polished, accessible, mobile-first journey companion for Mdm Lim's Bedok → Singapore General Hospital appointment journey, using the existing backend without inventing capabilities.

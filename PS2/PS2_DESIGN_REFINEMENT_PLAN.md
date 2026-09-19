@@ -9,6 +9,21 @@ The current interface is a styled prototype, not yet the polished mobile product
 
 This plan supersedes the visual and motion portions of `PS2_UX_POLISH_PLAN.md`. Preserve its state-coherence and truthful-feedback requirements. Audit the earlier checklist against code: the results document is not evidence that every earlier item was completed. TTS, general routing, live location and geographic maps remain outside this frontend pass.
 
+> **Correction, 19 Sep 2026 — the map exclusion in the line above does not stand.**
+> See `PS2_INDEX.md` §11.2. `PS2_DECISION_RECORD.md` §7.5 **D14 is titled "Never cut"**
+> and its first item is "Door-to-door route (step-free walks, EWL leg) on an OSM map with
+> attribution"; its fourth is "Visuals: affected route section shown by pattern and
+> label". `PS2_README.md` §3.2.3 requires the route on a map with the affected portion
+> distinguished, and §3.2.4 caps a submission missing it at level 3 on that part of the
+> score. What was legitimately parked is *offline tile caching* (backend issue I6,
+> `backend/app/api/offline.py:81`) — a narrow licensing question, not maps in general.
+>
+> The backend already serves `map.bbox` and `map.geometry` (a GeoJSON
+> `FeatureCollection`, one mode-tagged `LineString` per leg), so no backend work is
+> needed. Basemap decision: MapLibre GL JS with free-tier vector tiles. The rest of this
+> plan — tokens, spacing, typography, composition, motion — remains current and is the
+> visual direction of record.
+
 ## Independent findings
 
 | Priority | Evidence | Required response |
