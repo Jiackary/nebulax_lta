@@ -1,5 +1,16 @@
 # Nusa UI/UX polish results
 
+> **Qualified — historical record. Reconciled 19 Sep 2026; see `PS2_INDEX.md` §11.1.**
+> `PS2_DESIGN_REFINEMENT_PLAN.md`, written 38 minutes after this file, reviews the same
+> code and states: "the results document is not evidence that every earlier item was
+> completed." Treat the list below as what was *attempted*, not what shipped.
+>
+> Two corrections. (1) The "map-tile provider choice" listed under optional future work
+> contradicts `PS2_DECISION_RECORD.md` D14, a "never cut" list whose first item is the
+> OSM map — see `PS2_INDEX.md` §11.2. (2) The fixture-mode limitation recorded below has
+> since been lifted: the stack has been run against live LTA/OneMap credentials — see
+> `PS2_INDEX.md` §11.5.
+
 Completed 19 September 2026 on branch `codex/frontend`.
 
 ## Delivered

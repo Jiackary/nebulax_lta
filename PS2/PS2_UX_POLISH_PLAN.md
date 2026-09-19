@@ -1,5 +1,14 @@
 # Nusa UI/UX polish — independent review and implementation handoff
 
+> **Superseded in part — reconciled 19 Sep 2026; see `PS2_INDEX.md` §11.**
+> `PS2_DESIGN_REFINEMENT_PLAN.md` supersedes the **visual and motion** portions of this
+> document. Its state-coherence and truthful-feedback requirements still stand.
+>
+> One instruction below is withdrawn: "Do not... select a map-tile provider as part of UI
+> polish. Those programmes remain in `PS2_CONSOLIDATED_ROADMAP.md`." That roadmap's ten
+> tasks contain no map task, so the map fell through the gap between the two documents.
+> The route map is in scope per `PS2_DECISION_RECORD.md` D14 — see `PS2_INDEX.md` §11.2.
+
 **Goal:** Make the mobile journey companion feel composed, responsive and dependable through clear hierarchy, stable layouts, useful route context and complete loading/recovery feedback.
 
 **Review basis:** `codex/frontend`, frontend commit `535bdab`, plus the working-tree documentation. Browser inspection covered home, appointment form, failed planning and empty settings. Source inspection covered journey, coordinator, alternatives, offline save, API timeout and design styles. Planning in the running preview returned “The service is temporarily unavailable”; the successful journey and alternatives observations below are source-based, not claims of live browser verification. No real-device, screen-reader or performance benchmark was performed in this review.
