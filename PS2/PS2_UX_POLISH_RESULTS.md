@@ -20,6 +20,10 @@ Completed 19 September 2026 on branch `codex/frontend`.
   removal. Settings no longer links to itself.
 - Route changes reset scroll position and move keyboard focus to the new page's main
   landmark; background refreshes do neither.
+- The completed journey is now an art-directed companion surface: a prominent
+  departure-time card, tactile condition refresh control, route trace, more legible
+  step hierarchy, and an intentional wide-screen composition that collapses to one
+  reading column on mobile.
 
 ## Validation
 
@@ -29,9 +33,10 @@ Run from `PS2/frontend`:
 |---|---|
 | `npm run lint` | Passed |
 | `npm run typecheck` | Passed |
-| `npm run test:run` | Passed: 15 files, 31 tests |
-| `npm run build` | Passed; PWA precache 6 entries / 304.77 KiB |
+| `npm run test:run` | Passed: 15 files, 32 tests |
+| `npm run build` | Passed; PWA precache 6 entries / 312.42 KiB |
 | `PLAYWRIGHT_CHROME_EXECUTABLE='C:\Program Files\Google\Chrome\Application\chrome.exe'; npm run test:e2e` | Passed: Pixel 5 home flow and no horizontal overflow |
+| Live local fixture journey | Passed: backend health check and Bedok-to-SGH plan returned `200`; reviewed at desktop and 390 × 844 mobile viewport |
 
 The production build emitted the existing `vite-plugin-pwa` warning that
 `inlineDynamicImports` is deprecated. It did not fail the build.
@@ -42,8 +47,8 @@ The production build emitted the existing `vite-plugin-pwa` warning that
   used the installed local Chrome executable instead.
 - No real iPhone/Android, screen-reader, axe, or production service-worker offline
   deep-link run was completed in this pass.
-- The local backend was unavailable during the earlier design review, so live
-  Bedok-to-SGH planning was not revalidated through the browser. Unit tests cover
-  coordinator and loading-state behaviour with deterministic responses.
+- The local backend needs to be started for the client to plan a journey. The current
+  development server was started in fixture mode, which makes Bedok-to-SGH available
+  but does not validate live external LTA/OneMap data.
 - The larger UX plan still contains optional future work: map-tile provider choice,
   broader end-to-end state coverage, voice read-aloud and general station routing.
