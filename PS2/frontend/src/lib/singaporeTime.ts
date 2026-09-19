@@ -22,10 +22,14 @@ export function singaporeDateTimeToIso(value: string) {
 }
 
 export function formatSingaporeDateTime(value: string) {
+  const parsed = new Date(value)
+  // Intl throws on an invalid date. The screens that call this include the saved journey read
+  // back with no network, where a throw would blank the written steps rather than show a stamp.
+  if (Number.isNaN(parsed.getTime())) return value
   return new Intl.DateTimeFormat('en-GB', {
     dateStyle: 'long',
     timeStyle: 'short',
     hourCycle: 'h23',
     timeZone: 'Asia/Singapore',
-  }).format(new Date(value))
+  }).format(parsed)
 }

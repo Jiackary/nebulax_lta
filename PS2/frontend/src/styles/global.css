@@ -34,7 +34,7 @@ h2 { font-size: clamp(1.5rem, 6vw, 2rem); }
 .button-secondary { border-color: var(--line); background: var(--surface); }
 .how-it-helps { padding: 28px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
 .how-it-helps ol { display: grid; gap: 18px; padding: 0; margin: 24px 0 0; list-style: none; counter-reset: benefits; }
-.how-it-helps li { display: grid; grid-template-columns: 32px 1fr; column-gap: 12px; align-items: baseline; }
+.how-it-helps li { display: grid; grid-template-columns: 32px minmax(0, 1fr); column-gap: 12px; align-items: baseline; }
 .how-it-helps li::before { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: var(--green); background: var(--green-wash); font-size: 0.8125rem; font-weight: 800; counter-increment: benefits; content: counter(benefits); }
 .how-it-helps strong { grid-column: 2; }
 .how-it-helps span { grid-column: 2; color: var(--muted); font-size: 0.9375rem; }
@@ -63,7 +63,7 @@ h2 { font-size: clamp(1.5rem, 6vw, 2rem); }
 .status-qualification { padding: 10px; border-radius: 8px; color: #6f2614; background: #fff0eb; font-weight: 700; }
 .status-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 0.8125rem; }.status-meta span { padding: 4px 8px; border-radius: 999px; background: #f0f3f0; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }.section-heading .text-button { white-space: nowrap; }
-.journey-timeline { display: grid; gap: 0; padding: 0; margin: 24px 0 0; list-style: none; }.journey-leg { position: relative; display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding-bottom: 26px; }.journey-leg:not(:last-child)::before { position: absolute; top: 32px; bottom: 0; left: 14px; width: 2px; background: #bfd2c4; content: ''; }.journey-marker { position: relative; z-index: 1; display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; color: var(--green-dark); background: var(--green-wash); font-size: 0.8125rem; font-weight: 800; }.journey-mode { margin: 3px 0 4px; color: var(--green); font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; }.journey-step h3 { margin: 0; font-size: 1.05rem; line-height: 1.35; }.journey-detail, .journey-access, .journey-warning { margin: 6px 0 0; color: var(--muted); font-size: 0.9375rem; }.journey-warning { padding: 8px 10px; border-radius: 8px; color: #704406; background: #fff7e6; }
+.journey-timeline { display: grid; gap: 0; padding: 0; margin: 24px 0 0; list-style: none; }.journey-leg { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 14px; padding-bottom: 26px; }.journey-leg:not(:last-child)::before { position: absolute; top: 32px; bottom: 0; left: 14px; width: 2px; background: #bfd2c4; content: ''; }.journey-marker { position: relative; z-index: 1; display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; color: var(--green-dark); background: var(--green-wash); font-size: 0.8125rem; font-weight: 800; }.journey-mode { margin: 3px 0 4px; color: var(--green); font-size: 0.8125rem; font-weight: 800; text-transform: uppercase; }.journey-step h3 { margin: 0; font-size: 1.05rem; line-height: 1.35; }.journey-detail, .journey-access, .journey-warning { margin: 6px 0 0; color: var(--muted); font-size: 0.9375rem; }.journey-warning { padding: 8px 10px; border-radius: 8px; color: #704406; background: #fff7e6; }
 .attribution { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: 0.75rem; }.attribution span::before { content: '• '; }
 .options-page { display: grid; gap: 20px; max-width: 760px; }.options-page h1 { max-width: none; font-size: clamp(2.25rem, 10vw, 3.5rem); }.options-page .lede { margin: 0; }.original-option, .not-offered { display: grid; gap: 4px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--green-wash); }.original-option span, .not-offered p { margin: 0; color: var(--muted); }.options-list { display: grid; gap: 14px; }.option-card { padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }.option-card h2 { font-size: 1.35rem; }.option-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }.time-delta { padding: 4px 8px; border-radius: 999px; color: #704406; background: #fff0cf; font-size: 0.875rem; font-weight: 750; white-space: nowrap; }.option-basis { margin: 12px 0 0; color: var(--muted); font-size: 0.8125rem; }
 .offline-save { display: grid; gap: 10px; }.offline-saved { margin: 0; color: var(--green-dark); font-size: 0.9375rem; font-weight: 700; }
@@ -76,5 +76,25 @@ h2 { font-size: clamp(1.5rem, 6vw, 2rem); }
 .dialog-heading h2 { font-size: 1.5rem; }
 .dialog-close { min-width: 48px; min-height: 48px; border: 0; border-radius: 12px; color: var(--green-dark); background: var(--green-wash); font-weight: 750; }
 .dialog-body { margin-top: 20px; }
-@media (min-width: 768px) { .app-shell { padding: 32px 40px 80px; } .hero-panel { padding-bottom: 56px; } .how-it-helps { padding: 36px; } .how-it-helps ol { grid-template-columns: repeat(3, 1fr); gap: 28px; } .how-it-helps li { grid-template-columns: 32px 1fr; } }
+/* Reflow guards. A single-column grid's implicit track is `auto`, and a grid item's automatic
+   minimum size is its min-content size, so one unbreakable token — a long station name, an id,
+   a backend message — widens the track and every sibling with it until the page scrolls
+   sideways. An explicit minmax(0, 1fr) makes the token wrap instead. The same automatic minimum
+   stops a flex item shrinking, which is what `min-inline-size: 0` releases.
+   Batch 2 folds these into each component's own block; they are grouped here so the reflow fix
+   is reviewable on its own. */
+.journey-layout, .journey-skeleton, .options-page, .options-list, .settings-page, .demo-page,
+.appointment-form, .form-field, .offline-save, .how-it-helps ol, .route-overview,
+.route-overview-copy, .route-map { grid-template-columns: minmax(0, 1fr); }
+.site-header > *, .journey-hero-top > *, .journey-hero-footer > *, .section-heading > *,
+.ticket-top > *, .option-heading > *, .dialog-heading > *, .appointment-preview > *,
+.check-row > *, .endpoint > * { min-inline-size: 0; }
+/* A nowrap chip is the exception: released from its automatic minimum it shrinks to nothing and
+   spills its own text across the page, so it keeps its intrinsic width and the row wraps under
+   it instead. Crowded rows stack rather than clip — the appointment time and the arrival window
+   are not decoration, and `.journey-hero` clips its overflow to contain a decorative circle. */
+.journey-date, .route-chip, .time-delta, .section-heading .text-button { flex: none; }
+.journey-hero-top, .journey-hero-footer, .option-heading, .dialog-heading { flex-wrap: wrap; }
+
+@media (min-width: 768px) { .app-shell { padding: 32px 40px 80px; } .hero-panel { padding-bottom: 56px; } .how-it-helps { padding: 36px; } .how-it-helps ol { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; } .how-it-helps li { grid-template-columns: 32px minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }

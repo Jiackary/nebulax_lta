@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { formatSingaporeDateTime } from '../../lib/singaporeTime'
 import { JourneyTimeline } from './JourneyTimeline'
 import { StatusPanel } from './StatusPanel'
 import { useJourney } from './useJourney'
@@ -23,7 +24,7 @@ export function JourneyPage({ tripId }: { tripId: string }) {
         <div className="departure-lockup"><span>Leave at</span><h1 id="journey-heading">{plan.summary.leave_by_label.replace(/^Leave at\s*/i, '')}</h1></div>
         <div className="journey-hero-footer"><div><p className="journey-arrival">{plan.summary.arrival_label}</p><p className="journey-basis">{plan.summary.duration_min} min journey · {plan.summary.walk_distance_m} m walking</p></div><button className="refresh-orb" type="button" onClick={() => void refresh()} disabled={phase === 'refreshing'} aria-label={phase === 'refreshing' ? 'Checking current conditions' : 'Check current conditions'}><span aria-hidden="true">{phase === 'refreshing' ? '◌' : '↻'}</span></button></div>
       </section>
-      {snapshot.source === 'saved' && <p className="offline-notice">Offline copy · saved {snapshot.receivedAt}{snapshot.generatedAt ? ` · plan generated ${snapshot.generatedAt}` : ''}</p>}
+      {snapshot.source === 'saved' && <p className="offline-notice">Offline copy · saved {formatSingaporeDateTime(snapshot.receivedAt)}{snapshot.generatedAt ? ` · plan generated ${formatSingaporeDateTime(snapshot.generatedAt)}` : ''}</p>}
       {message && <p className="form-error" role="alert">{message}</p>}
       <AsyncFeedback operation={operation} label={operation === 'loading-effective-plan' ? 'Updating your directions…' : operation === 'preparing-offline' ? 'Preparing offline steps…' : 'Checking current conditions…'} />
       <StatusPanel status={status} routeConfirmed={routeConfirmed} statusFreshness={snapshot.statusFreshness} />
