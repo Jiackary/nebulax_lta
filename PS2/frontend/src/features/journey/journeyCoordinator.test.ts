@@ -45,6 +45,57 @@ describe('JourneyCoordinator', () => {
     expect(coordinator.state.message).toBe('Plan unavailable.')
   })
 
+  it('qualifies retained status when a refresh cannot complete', async () => {
+    const client = api({ getStatus: vi.fn().mockRejectedValue(new ApiError('UPSTREAM_UNAVAILABLE', 'Status unavailable.', true, 503)) })
+    const coordinator = new JourneyCoordinator(client)
+    await coordinator.initialize('trip-1')
+
+    await coordinator.refresh()
+
+    expect(coordinator.state.snapshot?.statusFreshness).toBe('failed')
+    expect(coordinator.state.snapshot?.routeConfirmed).toBe(false)
+    expect(coordinator.state.operation).toBe('idle')
+  })
+
+  it('keeps saved bundle provenance rather than treating hydration as a fresh check', () => {
+    const coordinator = new JourneyCoordinator(api())
+
+    coordinator.hydrateSaved('trip-1', plan as never, status as never, {
+      generatedAt: '2026-10-20T09:00:00+08:00',
+      savedAt: '2026-10-20T09:01:00+08:00',
+      warnings: ['Check before travelling.'],
+    })
+
+    expect(coordinator.state.snapshot).toMatchObject({
+      source: 'saved',
+      receivedAt: '2026-10-20T09:01:00+08:00',
+      generatedAt: '2026-10-20T09:00:00+08:00',
+      warnings: ['Check before travelling.'],
+      statusFreshness: 'stale',
+    })
+  })
+
+  it('commits an offline bundle plan and status together', async () => {
+    const offlinePlan = { ...plan, summary: { leave_by_label: 'Leave by 07:45' } }
+    const bundle = {
+      trip_id: 'trip-1', generated_at: '2026-10-20T09:00:00+08:00', plan: offlinePlan,
+      status_snapshot: status, warnings: ['Exit changed.'], steps_plain: [], attribution: [],
+      offline_notice: 'No signal.', tiles: { style_url: null, tile_pack_url: null, attribution: 'OSM', zoom_range: [13, 17], unavailable_reason: 'No tiles.' },
+    }
+    const coordinator = new JourneyCoordinator(api({ getOfflineBundle: vi.fn().mockResolvedValue(bundle) }))
+    await coordinator.initialize('trip-1')
+
+    await coordinator.prepareOffline()
+
+    expect(coordinator.state.snapshot).toMatchObject({
+      plan: offlinePlan,
+      status,
+      routeConfirmed: true,
+      warnings: ['Exit changed.'],
+    })
+    expect(coordinator.state.operation).toBe('idle')
+  })
+
   it('coalesces overlapping refresh requests', async () => {
     const client = api()
     const coordinator = new JourneyCoordinator(client)

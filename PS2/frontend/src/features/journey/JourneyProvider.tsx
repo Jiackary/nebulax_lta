@@ -6,7 +6,7 @@ import { JourneyCoordinator, type JourneyState } from './journeyCoordinator'
 import { JourneyContext } from './journeyContext'
 
 export function JourneyProvider({ children, tripId }: { children: ReactNode; tripId: string }) {
-  const [state, setState] = useState<JourneyState>({ phase: 'loading', snapshot: null, message: null })
+  const [state, setState] = useState<JourneyState>({ phase: 'loading', operation: 'loading-plan', snapshot: null, message: null })
   const coordinatorRef = useRef<JourneyCoordinator | null>(null)
 
   useEffect(() => {
@@ -21,7 +21,11 @@ export function JourneyProvider({ children, tripId }: { children: ReactNode; tri
       const saved = await readOfflineBundle(tripId).catch(() => undefined)
       if (!saved) return
       const plan = { ...saved.bundle.plan, trip_id: tripId }
-      current.hydrateSaved(tripId, plan, saved.bundle.status_snapshot)
+      current.hydrateSaved(tripId, plan, saved.bundle.status_snapshot ?? null, {
+        generatedAt: saved.bundle.generated_at,
+        savedAt: saved.savedAt,
+        warnings: saved.bundle.warnings,
+      })
     })
     return () => {
       unsubscribe()
@@ -31,6 +35,10 @@ export function JourneyProvider({ children, tripId }: { children: ReactNode; tri
   }, [tripId])
 
   const refresh = useCallback(() => coordinatorRef.current?.refresh() ?? Promise.resolve(), [])
-  const value = useMemo(() => ({ ...state, refresh }), [refresh, state])
+  const prepareOffline = useCallback(() => {
+    if (!coordinatorRef.current) return Promise.reject(new Error('This journey is no longer available.'))
+    return coordinatorRef.current.prepareOffline()
+  }, [])
+  const value = useMemo(() => ({ ...state, refresh, prepareOffline }), [prepareOffline, refresh, state])
   return <JourneyContext.Provider value={value}>{children}</JourneyContext.Provider>
 }

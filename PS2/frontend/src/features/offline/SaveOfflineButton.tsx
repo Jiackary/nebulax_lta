@@ -1,10 +1,11 @@
 import { useState } from 'react'
 
 import { ApiError } from '../../api/client'
-import { getOfflineBundle } from '../../api/trips'
 import { saveOfflineBundle } from './storage'
+import { useJourney } from '../journey/useJourney'
 
-export function SaveOfflineButton({ tripId }: { tripId: string }) {
+export function SaveOfflineButton({ tripId: _tripId }: { tripId: string }) {
+  const { prepareOffline } = useJourney()
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
 
@@ -12,7 +13,7 @@ export function SaveOfflineButton({ tripId }: { tripId: string }) {
     setState('saving')
     setMessage(null)
     try {
-      const bundle = await getOfflineBundle(tripId)
+      const bundle = await prepareOffline()
       await saveOfflineBundle(bundle)
       setState('saved')
       setMessage('Written journey saved on this device.')

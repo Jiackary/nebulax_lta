@@ -7,6 +7,9 @@ export type JourneyApi = {
   getOfflineBundle(tripId: string): Promise<OfflineBundle>
 }
 
+export type JourneyOperation = 'idle' | 'loading-plan' | 'checking-status' | 'loading-effective-plan' | 'preparing-offline'
+export type StatusFreshness = 'unavailable' | 'current' | 'stale' | 'failed'
+
 export type JourneySnapshot = {
   tripId: string
   plan: TripPlan
@@ -14,17 +17,21 @@ export type JourneySnapshot = {
   receivedAt: string
   source: 'network' | 'saved'
   routeConfirmed: boolean
+  statusFreshness: StatusFreshness
+  generatedAt?: string
+  warnings: string[]
 }
 
 export type JourneyPhase = 'loading' | 'ready' | 'refreshing' | 'degraded' | 'missing'
 
 export type JourneyState = {
   phase: JourneyPhase
+  operation: JourneyOperation
   snapshot: JourneySnapshot | null
   message: string | null
 }
 
-const initialState: JourneyState = { phase: 'loading', snapshot: null, message: null }
+const initialState: JourneyState = { phase: 'loading', operation: 'loading-plan', snapshot: null, message: null }
 
 export class JourneyCoordinator {
   private readonly api: JourneyApi
@@ -52,13 +59,17 @@ export class JourneyCoordinator {
   async initialize(tripId: string) {
     const generation = ++this.generation
     this.tripId = tripId
-    this.publish({ phase: 'loading', snapshot: null, message: null })
+    this.publish({ phase: 'loading', operation: 'loading-plan', snapshot: null, message: null })
     try {
       const plan = await this.api.getPlan(tripId)
       if (!this.isCurrent(generation, tripId)) return
       this.publish({
         phase: 'ready',
-        snapshot: { tripId, plan, status: null, receivedAt: new Date().toISOString(), source: 'network', routeConfirmed: false },
+        operation: 'idle',
+        snapshot: {
+          tripId, plan, status: null, receivedAt: new Date().toISOString(), source: 'network', routeConfirmed: false,
+          statusFreshness: 'unavailable', warnings: [],
+        },
         message: 'Status not checked yet.',
       })
     } catch (error) {
@@ -67,11 +78,19 @@ export class JourneyCoordinator {
     }
   }
 
-  hydrateSaved(tripId: string, plan: TripPlan, status: RouteStatus | null) {
+  hydrateSaved(tripId: string, plan: TripPlan, status: RouteStatus | null, metadata: {
+    generatedAt: string
+    savedAt: string
+    warnings: string[]
+  }) {
     this.tripId = tripId
     this.publish({
       phase: 'degraded',
-      snapshot: { tripId, plan, status, receivedAt: new Date().toISOString(), source: 'saved', routeConfirmed: false },
+      operation: 'idle',
+      snapshot: {
+        tripId, plan, status, receivedAt: metadata.savedAt, source: 'saved', routeConfirmed: false,
+        statusFreshness: status ? 'stale' : 'unavailable', generatedAt: metadata.generatedAt, warnings: metadata.warnings,
+      },
       message: 'Showing written journey saved on this device. Live status is not available.',
     })
   }
@@ -83,21 +102,60 @@ export class JourneyCoordinator {
     return this.pendingRefresh
   }
 
+  async prepareOffline(): Promise<OfflineBundle> {
+    const tripId = this.tripId
+    const generation = this.generation
+    if (!tripId) throw new Error('No journey is available to save offline.')
+    const previous = this.state.snapshot
+    this.publish({ phase: previous ? 'refreshing' : 'loading', operation: 'preparing-offline', snapshot: previous, message: null })
+    try {
+      const bundle = await this.api.getOfflineBundle(tripId)
+      if (!this.isCurrent(generation, tripId)) throw new Error('This journey is no longer active.')
+      const plan = { ...bundle.plan, trip_id: tripId } as TripPlan
+      const status = bundle.status_snapshot ?? null
+      this.publish({
+        phase: status?.replan_failed || plan.replan_failed ? 'degraded' : 'ready', operation: 'idle',
+        snapshot: {
+          tripId, plan, status, receivedAt: bundle.generated_at, source: 'network',
+          routeConfirmed: Boolean(status) && !status.replan_failed && !plan.replan_failed,
+          statusFreshness: status ? (status.stale ? 'stale' : 'current') : 'unavailable',
+          warnings: bundle.warnings,
+        },
+        message: status?.replan_failed || plan.replan_failed ? 'The route could not be safely updated. Read the warnings before travelling.' : null,
+      })
+      return bundle
+    } catch (error) {
+      if (this.isCurrent(generation, tripId)) {
+        this.publish({
+          phase: previous ? 'degraded' : 'loading', operation: 'idle', snapshot: previous,
+          message: this.messageFor(error),
+        })
+      }
+      throw error
+    }
+  }
+
   private async refreshCurrent() {
     const tripId = this.tripId
     const generation = this.generation
     if (!tripId) return
     const previous = this.state.snapshot
-    this.publish({ phase: previous ? 'refreshing' : 'loading', snapshot: previous, message: null })
+    this.publish({
+      phase: previous ? 'refreshing' : 'loading', operation: 'checking-status', snapshot: previous, message: null,
+    })
     try {
       const status = await this.api.getStatus(tripId)
       if (!this.isCurrent(generation, tripId)) return
       try {
+        this.publish({ phase: 'refreshing', operation: 'loading-effective-plan', snapshot: previous, message: null })
         const plan = await this.api.getPlan(tripId)
         if (!this.isCurrent(generation, tripId)) return
         this.publish({
-          phase: 'ready',
-          snapshot: { tripId, plan, status, receivedAt: new Date().toISOString(), source: 'network', routeConfirmed: true },
+          phase: 'ready', operation: 'idle',
+          snapshot: {
+            tripId, plan, status, receivedAt: new Date().toISOString(), source: 'network', routeConfirmed: true,
+            statusFreshness: status.stale ? 'stale' : 'current', warnings: [],
+          },
           message: null,
         })
       } catch (error) {
@@ -107,14 +165,20 @@ export class JourneyCoordinator {
           return
         }
         this.publish({
-          phase: 'degraded',
-          snapshot: { ...previous, status, receivedAt: new Date().toISOString(), routeConfirmed: false },
+          phase: 'degraded', operation: 'idle',
+          snapshot: {
+            ...previous, status, receivedAt: new Date().toISOString(), routeConfirmed: false,
+            statusFreshness: 'failed',
+          },
           message: this.messageFor(error),
         })
       }
     } catch (error) {
       if (!this.isCurrent(generation, tripId)) return
-      if (previous) this.publish({ phase: 'degraded', snapshot: previous, message: this.messageFor(error) })
+      if (previous) this.publish({
+        phase: 'degraded', operation: 'idle', snapshot: { ...previous, routeConfirmed: false, statusFreshness: 'failed' },
+        message: this.messageFor(error),
+      })
       else this.publishError(error)
     }
   }
@@ -129,10 +193,10 @@ export class JourneyCoordinator {
 
   private publishError(error: unknown) {
     if (error instanceof ApiError && error.code === 'TRIP_NOT_FOUND') {
-      this.publish({ phase: 'missing', snapshot: null, message: error.message })
+      this.publish({ phase: 'missing', operation: 'idle', snapshot: null, message: error.message })
       return
     }
-    this.publish({ phase: 'degraded', snapshot: this.state.snapshot, message: this.messageFor(error) })
+    this.publish({ phase: 'degraded', operation: 'idle', snapshot: this.state.snapshot, message: this.messageFor(error) })
   }
 
   private publish(state: JourneyState) {

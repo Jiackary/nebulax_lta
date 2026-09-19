@@ -25,4 +25,11 @@ describe('StatusPanel', () => {
 
     expect(screen.getByText(/previous plan.*may not be usable/i)).toBeVisible()
   })
+
+  it('does not present retained all-clear status as current after a failed refresh', () => {
+    render(<StatusPanel status={{ ...status, stale: false } as never} routeConfirmed={false} statusFreshness="failed" />)
+
+    expect(screen.getByText(/could not be updated/i)).toBeVisible()
+    expect(screen.getByText(/directions below have not been confirmed/i)).toBeVisible()
+  })
 })
