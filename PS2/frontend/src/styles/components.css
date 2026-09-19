@@ -15,14 +15,12 @@
   text-decoration: none;
 }
 
-.wordmark span {
-  display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  place-items: center;
-  border-radius: 0.5rem;
-  color: var(--on-forest);
-  background: var(--forest);
+/* The mark is its own shape and carries its own colour, so it sits on the canvas rather than
+   inside a tinted tile. Sized by height: it is taller than it is wide. */
+.wordmark img {
+  width: auto;
+  height: 2.5rem;
+  flex: none;
 }
 
 /* The three header slots share 320px with a 48px control. Both labels stay on one line and

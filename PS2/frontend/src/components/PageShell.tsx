@@ -1,6 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
+import wobbleMark from '../assets/wobble-mark.png'
+
 type Back = { to: string; label: string }
 
 /**
@@ -34,9 +36,7 @@ export function PageShell({ title, back, wide = false, children }: {
           )
           : (
             <Link className="wordmark" to="/" aria-label="Wobble journey home">
-              <span aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 128 128" fill="none" stroke="currentColor" strokeWidth="19" strokeLinecap="round" aria-hidden="true"><path d="M22 64q21-42 42 0t42 0" /></svg>
-              </span>
+              <img src={wobbleMark} alt="" width="160" height="160" />
               Wobble
             </Link>
           )}

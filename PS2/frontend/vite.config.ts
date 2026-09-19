@@ -11,6 +11,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'prompt',
+      // The plugin adds every manifest icon to the precache on top of whatever globPatterns
+      // matches, which listed the 192 twice. The glob below is the single source of truth.
+      includeManifestIcons: false,
       // Offline tile caching is parked on licensing grounds, so a cached map can never
       // draw a basemap. Precaching its 1 MB chunk would cost her mobile data to store
       // something offline can't use; let it load from the network when the map is opened.
@@ -18,8 +21,13 @@ export default defineConfig({
       // saved journey, and a departure time that reflows when the font arrives is worse
       // than one that never had to.
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,woff2}'],
-        globIgnores: ['**/RouteMap-*.js', '**/RouteMap-*.css', '**/maplibre-gl-worker-*.js'],
+        globPatterns: ['**/*.{js,css,html,woff2,png}'],
+        // The 512px icon is only read by the installer, so it is not worth 188 KB of her
+        // storage; the 192 is enough for the tab and the home-screen tile.
+        globIgnores: [
+          '**/RouteMap-*.js', '**/RouteMap-*.css', '**/maplibre-gl-worker-*.js',
+          '**/wobble-512.png',
+        ],
       },
       // Production builds get a registration script injected automatically, but dev builds
       // do not: without this the worker never installs on :5173, navigator.serviceWorker.ready
@@ -32,7 +40,10 @@ export default defineConfig({
         theme_color: '#0d6048',
         background_color: '#f4f5f0',
         display: 'standalone',
-        icons: [{ src: '/icons/wobble.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [
+          { src: '/icons/wobble-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/wobble-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+        ],
       },
     }),
   ],
