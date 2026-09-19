@@ -4,10 +4,13 @@ import { JourneyTimeline } from './JourneyTimeline'
 import { StatusPanel } from './StatusPanel'
 import { useJourney } from './useJourney'
 import { SaveOfflineButton } from '../offline/SaveOfflineButton'
+import { AsyncFeedback } from '../../components/AsyncFeedback'
+import { JourneySkeleton } from './JourneySkeleton'
+import { RouteOverview } from './RouteOverview'
 
 export function JourneyPage({ tripId }: { tripId: string }) {
   const { phase, snapshot, message, refresh, operation } = useJourney()
-  if (phase === 'loading' && !snapshot) return <section className="content-panel" aria-live="polite"><p className="eyebrow">Journey</p><h1>Preparing your journey</h1><p className="lede">Loading your route and the latest status.</p></section>
+  if (phase === 'loading' && !snapshot) return <JourneySkeleton />
   if (phase === 'missing') return <section className="content-panel"><p className="eyebrow">Journey unavailable</p><h1>This journey is no longer available</h1><p className="lede">It may have expired or been deleted.</p><Link className="button button-primary" to="/plan">Plan a new journey</Link></section>
   if (!snapshot) return <section className="content-panel"><p className="eyebrow">Journey unavailable</p><h1>We could not load this journey</h1><p className="lede">{message ?? 'Please try again.'}</p><Link className="button button-primary" to="/">Go home</Link></section>
 
@@ -23,9 +26,10 @@ export function JourneyPage({ tripId }: { tripId: string }) {
       </section>
       {snapshot.source === 'saved' && <p className="offline-notice">Offline copy · saved {snapshot.receivedAt}{snapshot.generatedAt ? ` · plan generated ${snapshot.generatedAt}` : ''}</p>}
       {message && <p className="form-error" role="alert">{message}</p>}
-      {operation === 'checking-status' && <p className="journey-activity" role="status">Checking current conditions…</p>}
-      {operation === 'loading-effective-plan' && <p className="journey-activity" role="status">Updating your directions…</p>}
+      <AsyncFeedback operation={operation} label={operation === 'loading-effective-plan' ? 'Updating your directions…' : operation === 'preparing-offline' ? 'Preparing offline steps…' : 'Checking current conditions…'} />
       <StatusPanel status={status} routeConfirmed={routeConfirmed} statusFreshness={snapshot.statusFreshness} />
+      {snapshot.warnings.map((warning) => <p className="journey-warning journey-route-warning" role="alert" key={warning}>{warning}</p>)}
+      <RouteOverview legs={plan.legs} />
       <section className="timeline-panel" aria-labelledby="steps-heading">
         <div className="section-heading"><div><p className="eyebrow">Your route</p><h2 id="steps-heading">Journey steps</h2></div><Link className="text-button" to={`/trip/${encodeURIComponent(tripId)}/options`}>See options</Link></div>
         <JourneyTimeline plan={plan} />
