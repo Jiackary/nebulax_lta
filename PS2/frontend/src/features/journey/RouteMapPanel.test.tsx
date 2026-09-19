@@ -19,6 +19,21 @@ describe('RouteMapPanel', () => {
     expect(screen.getByText(/written steps below are complete/i)).toBeVisible()
   })
 
+  it('does not reach for the map chunk at all on a journey restored from offline storage', () => {
+    const geometry = {
+      type: 'FeatureCollection' as const,
+      features: [{ type: 'Feature' as const, properties: { leg_id: 'l1', mode: 'walk' }, geometry: { type: 'LineString' as const, coordinates: [[103.9, 1.3], [103.91, 1.31]] } }],
+    }
+
+    render(<RouteMapPanel legs={legs} map={{ bbox: [103.9, 1.3, 103.91, 1.31], geometry }} status={null} offline />)
+
+    // The chunk is not precached, so offline the dynamic import rejects. Nothing catches
+    // that above this component, so reaching for it blanks the whole page — including the
+    // written steps she saved for exactly this moment.
+    expect(screen.getByText(/map is not available offline/i)).toBeVisible()
+    expect(screen.getByText(/written steps below are complete/i)).toBeVisible()
+  })
+
   it('falls back when the bounding box is malformed rather than rendering a broken map', () => {
     const geometry = {
       type: 'FeatureCollection' as const,
