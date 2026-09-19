@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { ApiError } from '../../api/client'
 import { createTrip } from '../../api/trips'
-import { singaporeDateTimeToIso, validateSingaporeDateTime } from '../../lib/singaporeTime'
+import { formatSingaporeDateTime, singaporeDateTimeToIso, validateSingaporeDateTime } from '../../lib/singaporeTime'
+import { AsyncFeedback } from '../../components/AsyncFeedback'
 import { setActiveTripId } from './activeTrip'
 
 function futureSingaporeDateTime() {
@@ -56,18 +57,21 @@ export function AppointmentForm() {
       <div className="form-field">
         <label htmlFor="appointment-at">Appointment date and time</label>
         <span id="appointment-help">Singapore time</span>
-        <input id="appointment-at" name="appointment-at" type="datetime-local" value={appointmentAt} aria-describedby="appointment-help appointment-error" onChange={(event) => setAppointmentAt(event.target.value)} />
+        <input id="appointment-at" name="appointment-at" type="datetime-local" value={appointmentAt} aria-describedby="appointment-help appointment-error" aria-invalid={Boolean(error)} disabled={submitting} onChange={(event) => setAppointmentAt(event.target.value)} />
+        {!validateSingaporeDateTime(appointmentAt) && <span>{formatSingaporeDateTime(singaporeDateTimeToIso(appointmentAt))}</span>}
       </div>
-      <fieldset className="form-field">
+      <fieldset className="form-field" disabled={submitting}>
         <legend>Journey preferences</legend>
         <label className="check-row"><input type="checkbox" checked={preferSheltered} onChange={(event) => setPreferSheltered(event.target.checked)} /> Prefer more sheltered walking where available</label>
-        <label>Arrival buffer
+        <label>Arrive early by
+          <span className="field-helper">Extra time before your appointment.</span>
           <select value={bufferMin} onChange={(event) => setBufferMin(Number(event.target.value))}>
             <option value={0}>No extra buffer</option><option value={15}>15 minutes</option><option value={30}>30 minutes</option><option value={45}>45 minutes</option>
           </select>
         </label>
       </fieldset>
       {error && <p id="appointment-error" className="form-error" role="alert">{error}</p>}
+      <AsyncFeedback operation={submitting ? 'creating-trip' : 'idle'} label="Preparing your journey…" />
       <button className="button button-primary" type="submit" disabled={submitting}>{submitting ? 'Planning journey…' : 'Plan journey'}</button>
     </form>
   )

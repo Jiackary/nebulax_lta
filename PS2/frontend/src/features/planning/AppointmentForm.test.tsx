@@ -54,4 +54,15 @@ describe('appointment form', () => {
     })
     expect(screen.getByRole('heading', { name: /preparing your journey/i })).toBeVisible()
   })
+
+  it('explains that the request is preparing a journey while submission is pending', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => undefined)))
+    planPage()
+
+    await user.click(screen.getByRole('button', { name: /plan journey/i }))
+
+    expect(screen.getByText(/preparing your journey/i)).toBeVisible()
+    expect(screen.getByRole('button', { name: /planning/i })).toBeDisabled()
+  })
 })

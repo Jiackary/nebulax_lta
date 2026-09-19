@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import type { JourneyOperation } from '../features/journey/journeyCoordinator'
-
-export function AsyncFeedback({ operation, label }: { operation: JourneyOperation; label: string }) {
+export function AsyncFeedback({ operation, label }: { operation: string; label: string }) {
   if (operation === 'idle') return null
   return <TimedFeedback key={operation} label={label} />
 }
